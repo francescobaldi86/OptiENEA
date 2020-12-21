@@ -1,0 +1,30 @@
+{{#0D}}
+param {{param_name}} := {{value}};
+{{/0D}}
+
+{{#1D}} 
+param {{param_name}} := 
+{{#objects}} 
+	{{name}}	{{value}} 
+{{/objects}}; 
+{{/1D}}
+
+{{#2D}} 
+param {{param_name}} := 
+	{{#slice_1}}
+	["{{name}}", *] 
+		{{#slice_2}} {{name}}	{{value}} {{/slice_2}}
+	{{/slice_1}};
+{{/2D}}
+
+{{#3D}} 
+param {{param_name}} := 
+	{{#slice}}
+	["{{name_1}}", "{{name_2}}", *] := 
+{{#objects}} 
+	{{name_3}}	{{value}} 
+{{/objects}}
+{{/slice}};
+{{/3D}}
+
+end;
