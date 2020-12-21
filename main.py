@@ -19,14 +19,12 @@ from winsound import Beep
 
 def main():
     problem = Problem("AmmoniaProblem")
-    problem.set_problem_folders({
-        "main": "Dropbox\\Condivisa Coraddu-Collu-Baldi\\Ottimizzatore\\GLPK",
-        "temp": "Documents\\ENEA"})
+    problem.set_problem_folders("file")
     problem.parse_general_input_file()
     problem.parse_problem_units()
     problem.parse_problem_sets()
     problem.parse_problem_parameters()
-    problem, full_simulation_matrix = simulationManager(problem)
+    simulationManager(problem)
     Beep(frequency = 500, duration = 500)
 
     return None

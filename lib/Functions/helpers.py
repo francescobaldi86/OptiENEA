@@ -4,6 +4,7 @@ def read_input_from_file(data_structure, filename):
       input to the problem, in the form of a multi-level dictionary
       """
     with open(filename) as file:
+        field_L1 = None
         for line in file.readlines():
             # The "#" is the signed used for comments
             if line[0] == "#":
@@ -20,7 +21,10 @@ def read_input_from_file(data_structure, filename):
                 fields = line.split(sep=";")
                 for id_field, field in enumerate(fields):
                     fields[id_field] = field.replace("\n", "").strip()
-                data_structure[field_L1] = saveInfoRecursively(data_structure[field_L1], fields)
+                if field_L1 is not None:
+                    data_structure[field_L1] = saveInfoRecursively(data_structure[field_L1], fields)
+                else:
+                    data_structure = saveInfoRecursively(data_structure, fields)
     return data_structure
 
 

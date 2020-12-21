@@ -12,14 +12,17 @@ from datetime import datetime
 from lib.Functions.helpers import read_input_from_file
 from lib.Functions.inputParser import parse_sets
 from lib.Functions.inputParser import parse_parameters
+import lib.Functions.GUI as GUI
 
 class Problem:
       # Initialization function
       def __init__(self, name):
             self.name = name
-            self.working_folder = dict()
-            self.optienea_folder = os.getcwd() + "\\"
-            self.output_folder = dict()
+            self.problem_folder = None
+            self.sim_folder = None
+            self.optienea_folder = None
+            self.temp_problem_folder = None
+            self.temp_folder = None
             self.units = dict()
             self.parameters = dict()
             self.parametric = dict()
@@ -27,15 +30,36 @@ class Problem:
             self.main = dict()
             self.nSim = 0
 
-      def set_problem_folders(self, folders):
+      def set_problem_folders(self, input_type):
             date = datetime.now().strftime("%Y-%m-%d %Hh%M")
-            for type in ["main"]:
-                  self.working_folder[type] = "C:\\Users\\" + os.getcwd().split(sep="\\")[2] + "\\" + folders[type] + "\\" + self.name + "\\"
-                  self.output_folder[type] = self.working_folder[type] + date + "\\"
-                  os.mkdir(self.output_folder[type])
+            # Set the folder of the "OptiENEA" toolbox, which is where this file is located
+            self.optienea_folder = os.getcwd() + "\\"
+            # Now reading where the other folders are.
+            if input_type == "user":
+                  self.problem_folder, self.temp_problem_folder = GUI.get_problem_directories()
+            elif input_type == "file":
+                  temp = dict()
+                  try:
+                        temp = read_input_from_file(temp, self.optienea_folder + self.name + ".txt")
+                  except FileNotFoundError:
+                        temp_file = GUI.get_problem_general_file_folder()
+                  finally:
+                        self.problem_folder = temp["Main"]
+                        if "Temp" in temp.keys():
+                              self.temp_problem_folder = temp["Temp"]
+            else:
+                  raise ValueError("The value of the input_type should be either 'user' or 'file'")
+            self.problem_folder = self.problem_folder + "\\"
+            self.sim_folder = self.problem_folder + self.name + "_" + date + "\\"
+            os.mkdir(self.sim_folder)
+            # If the information about a temporary folder is given, we create it. Otherwise not
+            if self.temp_problem_folder is not None:
+                  self.temp_problem_folder = self.temp_problem_folder + "\\"
+                  self.temp_folder = self.temp_problem_folder + self.name + "_" + date + "\\"
+                  os.mkdir(self.temp_folder)
 
       def parse_general_input_file(self):
-            temp = read_input_from_file({}, self.working_folder["main"] + "general.txt")
+            temp = read_input_from_file({}, self.problem_folder + "general.txt")
             for category, item in temp.items():
                   if category == "main":
                         self.main = item
@@ -49,7 +73,7 @@ class Problem:
                         raise(ValueError, "The provided input type in the general.txt file is not recognized")
 
       def parse_problem_units(self):
-            self.units = read_input_from_file({}, self.working_folder["main"] + "units.txt")
+            self.units = read_input_from_file({}, self.problem_folder + "units.txt")
 
       def parse_problem_sets(self):
             self.sets = {"0": dict(), "1": dict(), "2": dict()}

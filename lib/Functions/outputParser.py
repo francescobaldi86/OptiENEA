@@ -5,7 +5,10 @@ def outputManager(problem, sim_id, output_dict = None):
     """
     This function takes care of all the actions required to read the output
     """
-    filename_output = problem.output_folder["main"] + sim_id + "\\output.out"
+    if problem.temp_problem_folder is not None:
+        filename_output = problem.temp_folder + sim_id + "\\output.out"
+    else:
+        filename_output = problem.sim_folder + sim_id + "\\output.out"
     variables_to_read = problem.main["Outputs of interest"]
     output_sim = parserOutput(filename_output, variables_to_read)
     if not isinstance(output_dict, dict):

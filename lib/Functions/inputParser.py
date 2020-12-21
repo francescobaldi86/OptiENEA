@@ -77,7 +77,7 @@ def parse_parameters(problem):
                 POWER_MAX[name][sets["1"]["layersOfUnit"][name][idx]] = unit["MaxPower"][idx]
                 ENERGY_AVERAGE_PRICE[sets["1"]["layersOfUnit"][name][idx]] = float(unit["AveragePrice"][idx])
             if unit["TimeDependentPrice"] == "file":
-                temp = pd.read_csv(problem.working_folder['main'] + name + ".csv", index_col=0)
+                temp = pd.read_csv(problem.problem_folder + name + ".csv", index_col=0)
                 for col in temp.keys():
                     ENERGY_PRICE_VARIATION[col] = temp[col].to_dict()
         if unit["Type"] == "Storage":
@@ -89,7 +89,7 @@ def parse_parameters(problem):
             temp = unit["Power"]
             if temp == "file":
                 POWER[name] = dict()
-                temp = pd.read_csv(problem.working_folder['main'] + name + ".csv", index_col=0)
+                temp = pd.read_csv(problem.problem_folder + name + ".csv", index_col=0)
                 for lay in temp.keys():
                     POWER[name][lay] = temp[lay].to_dict()
             else:

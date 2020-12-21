@@ -21,7 +21,7 @@ def simulationManager(problem):
     problem, simulation_matrix, full_simulation_matrix = saveSimulationMatrix(problem)
     writeProblemSets(problem)
     copyfile(problem.optienea_folder + "problem_types\\" + problem.main["Problem type"] + "\\mod_file.mod",
-             problem.output_folder["main"] + "mod_file.mod")
+             problem.sim_folder + "mod_file.mod")
     # Now we can finally run the simulations
     counter = 0
     elapsed_time, start_time = 0, time.time()
@@ -31,15 +31,15 @@ def simulationManager(problem):
         parameters = copy.deepcopy(problem.parameters)
         if sim != "REF":
             parameters = updateParameters(parameters, problem, simulation_matrix.loc[sim, :])
-        parameters = runCustomPythonCode(problem.working_folder["main"], simulation_matrix.loc[sim, :], parameters)
+        parameters = runCustomPythonCode(problem.problem_folder, simulation_matrix.loc[sim, :], parameters)
         writeProblemParameters(parameters, simulation_matrix.loc[sim, :], problem)
         runSimulation(problem, sim, counter, len(simulation_matrix.index), elapsed_time)
         elapsed_time = time.time() - start_time
         output = out.outputManager(problem, sim, output)
     output = pd.DataFrame(output, index = simulation_matrix.index)
     output = out.filterOutput(output)
-    output.to_csv(problem.output_folder["main"] + "output.csv")
-    pd.concat([simulation_matrix, output], axis=1).to_csv(problem.output_folder["main"] + "output_full.csv")
+    output.to_csv(problem.sim_folder + "output.csv")
+    pd.concat([simulation_matrix, output], axis=1).to_csv(problem.sim_folder + "output_full.csv")
     return output, simulation_matrix
 
 def saveSimulationMatrix(problem):
@@ -51,13 +51,13 @@ def saveSimulationMatrix(problem):
     #if "GSA" in problem["Main"]["Analysis"]:
         # problem, simulation_matrix = generateSensitivitySample(problem, simulation_matrix)
     problem.nSim = len(full_simulation_matrix)
-    full_simulation_matrix.to_csv(problem.output_folder["main"] + "full_simulation_matrix.csv")
+    full_simulation_matrix.to_csv(problem.sim_folder + "full_simulation_matrix.csv")
     simulation_matrix = full_simulation_matrix.copy()
     for col in full_simulation_matrix.keys():
         temp = simulation_matrix[col].to_numpy()
         if (temp[0] == temp).all() or simulation_matrix[col].isnull().all():
             simulation_matrix = simulation_matrix.drop(columns = [col])
-    simulation_matrix.to_csv(problem.output_folder["main"] + "simulation_matrix.csv")
+    simulation_matrix.to_csv(problem.sim_folder + "simulation_matrix.csv")
     return problem, simulation_matrix, full_simulation_matrix
 
 
@@ -109,7 +109,7 @@ def writeProblemSets(problem):
         with open(problem.optienea_folder + "problem_types\\" + problem.main[
             "Problem type"] + "\\data_sets.mustache", "r") as f:
             data_sets = chevron.render(f, output)
-        with open(problem.output_folder["main"] + "sets.dat", "w") as f:
+        with open(problem.sim_folder + "sets.dat", "w") as f:
             f.write(data_sets)
     return None
 
@@ -164,15 +164,29 @@ def writeProblemParameters(parameters, data, problem):
         output["3D"].append({"param_name": param_name, "slice": slice})
     # Finally we write the data file with the sets information
     with open(problem.optienea_folder + "problem_types\\" + problem_type + "\\data_parameters.mustache", "r") as f:
-        data_sets = chevron.render(f, output)
-    os.mkdir(problem.output_folder["main"] + data.name)
-    with open(problem.output_folder["main"] + data.name + "\\parameters.dat", "w") as f:
-        f.write(data_sets)
+        data_parameters = chevron.render(f, output)
+    if problem.temp_folder is None:
+        os.mkdir(problem.sim_folder + data.name)
+        filename = problem.sim_folder + data.name + "\\parameters.dat"
+    else:
+        os.mkdir(problem.temp_folder + data.name)
+        filename = problem.temp_folder + data.name + "\\parameters.dat"
+    with open(filename, "w") as f:
+        f.write(data_parameters)
     return None
 
 
 def runSimulation(problem, simname, counter, nsim_tot, elapsed_time):
-    os.chdir(problem.output_folder["main"] + simname)  # Changes the current directory to the output folder
+    """
+    This is the function that actually runs the simulations
+    """
+    if problem.temp_problem_folder is None:
+        os.chdir(problem.sim_folder + simname)  # Changes the current directory to the output folder
+    else:
+        if counter == 1:
+            copyfile(problem.sim_folder + "mod_file.mod", problem.temp_folder + "mod_file.mod")
+            copyfile(problem.sim_folder + "sets.dat", problem.temp_folder + "sets.dat")
+        os.chdir(problem.temp_folder + simname)  # Changes the current directory to the output folder
     # temp = os.system("glpsol -m ..\\mod_file.mod -d ..\\sets.dat -d parameters.dat -o output.out --log log.txt")
     if elapsed_time == 0:
         time_left = " is unknown"
