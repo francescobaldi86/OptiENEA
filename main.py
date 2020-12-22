@@ -19,7 +19,7 @@ from winsound import Beep
 
 def main():
     problem = Problem("AmmoniaProblem")
-    problem.set_problem_folders("file")
+    problem.set_problem_folders("user")
     problem.parse_general_input_file()
     problem.parse_problem_units()
     problem.parse_problem_sets()
