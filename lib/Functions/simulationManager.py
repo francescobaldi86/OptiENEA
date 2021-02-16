@@ -20,7 +20,7 @@ def simulationManager(problem):
     """
     problem, simulation_matrix, full_simulation_matrix = saveSimulationMatrix(problem)
     writeProblemSets(problem)
-    copyfile(problem.optienea_folder + "problem_types\\" + problem.main["Problem type"] + "\\mod_file.mod",
+    copyfile(problem.optienea_folder + "problem_types\\" + problem.main["problem_type"] + "\\mod_file.mod",
              problem.sim_folder + "mod_file.mod")
     # Now we can finally run the simulations
     counter = 0
@@ -46,7 +46,7 @@ def saveSimulationMatrix(problem):
     # First we create the dataframe based on the reference simulation
     full_simulation_matrix = saveReferenceParameterValues(problem)
     # Part 2: Other simulations
-    if "parametric" in problem.main["Analysis"]:
+    if "parametric" in problem.main["analysis"]:
         full_simulation_matrix = parametricSimulationMatrix(problem, full_simulation_matrix)
     #if "GSA" in problem["Main"]["Analysis"]:
         # problem, simulation_matrix = generateSensitivitySample(problem, simulation_matrix)
@@ -107,7 +107,7 @@ def writeProblemSets(problem):
             output["1D"].append({"set_name": set_name, "slice_name": slice_name, "objects": objects})
     # Finally we write the data file with the sets information
         with open(problem.optienea_folder + "problem_types\\" + problem.main[
-            "Problem type"] + "\\data_sets.mustache", "r") as f:
+            "problem_type"] + "\\data_sets.mustache", "r") as f:
             data_sets = chevron.render(f, output)
         with open(problem.sim_folder + "sets.dat", "w") as f:
             f.write(data_sets)
@@ -119,7 +119,7 @@ def writeProblemParameters(parameters, data, problem):
     This function is used to write the parameters of the problem into a .dat input file for GLPK
     """
     # First we read the data for 0-Dimensional parameters, i.e. single-value parameters
-    problem_type = problem.main["Problem type"]
+    problem_type = problem.main["problem_type"]
     output = dict()
     output["0D"] = list()
     for param_name, value in parameters["0"].items():

@@ -78,7 +78,7 @@ class Problem:
       def parse_problem_sets(self):
             self.sets = {"0": dict(), "1": dict(), "2": dict()}
             self.sets["0"]["timeSteps"] = list(
-                  [str(i) for i in range(1, int(self.main["General parameters"]["NT"]) + 1)])
+                  [str(i) for i in range(1, int(self.main["general_parameters"]["NT"]) + 1)])
             self.sets = parse_sets(self.sets, self.units)
 
       def parse_problem_parameters(self):

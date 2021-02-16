@@ -61,14 +61,14 @@ def parse_parameters(problem):
             POWER_MAX_REL[name] = dict()
             if "InvestmentCost" in unit.keys():
                 SPECIFIC_INVESTMENT_COST_ANNUALIZED[name] = calculateAnnualizedInvestmentCost(
-                    unit["InvestmentCost"], unit["Lifetime"], problem.main["General parameters"]["InterestRate"])
+                    unit["InvestmentCost"], unit["Lifetime"], problem.main["general_parameters"]["InterestRate"])
             else:
                 SPECIFIC_INVESTMENT_COST_ANNUALIZED[name] = 0
             for idx in range(len(sets["1"]["layersOfUnit"][name])):
                 POWER_MAX[name][sets["1"]["layersOfUnit"][name][idx]] = unit["MaxPower"][idx]
                 if "ActivationFrequency" in unit.keys():
                     POWER_MAX_REL[name][sets["1"]["layersOfUnit"][name][idx]] = setRelativeMaxPower(
-                        unit["ActivationFrequency"][idx], problem.main["General parameters"]["NT"])
+                        unit["ActivationFrequency"][idx], problem.main["general_parameters"]["NT"])
 
         if unit["Type"] == "Market": # This is only for units of type "Market"
             POWER_MAX[name] = dict()
@@ -84,7 +84,7 @@ def parse_parameters(problem):
             CRATE[name], ERATE[name], = float(unit["Rates"][0]), float(unit["Rates"][1])
             ENERGY_MAX[name] = float(unit["MaxEnergy"])
             SPECIFIC_INVESTMENT_COST_ANNUALIZED[name] = calculateAnnualizedInvestmentCost(
-                unit["InvestmentCost"], unit["Lifetime"], problem.main["General parameters"]["InterestRate"])
+                unit["InvestmentCost"], unit["Lifetime"], problem.main["general_parameters"]["InterestRate"])
         if unit["Type"] == "Process":
             temp = unit["Power"]
             if temp == "file":
