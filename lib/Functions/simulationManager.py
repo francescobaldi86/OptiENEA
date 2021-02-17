@@ -19,8 +19,8 @@ def simulationManager(problem):
     This function simply prepares the whole simulations setup
     """
     problem, simulation_matrix, full_simulation_matrix = saveSimulationMatrix(problem)
-    writeProblemSets(problem)
-    copyfile(problem.optienea_folder + "problem_types\\" + problem.main["Problem type"] + "\\mod_file.mod",
+    writeProblemSets(problem) # The problem sets are written only once, at the beginning
+    copyfile(problem.optienea_folder + "problem_types\\" + problem.problem_type + "\\mod_file.mod",
              problem.sim_folder + "mod_file.mod")
     # Now we can finally run the simulations
     counter = 0
@@ -29,6 +29,7 @@ def simulationManager(problem):
     for sim in simulation_matrix.index:
         counter += 1
         parameters = copy.deepcopy(problem.parameters)
+        set_output(problem, sim)  # The output writing system is updated only once, at the beginning
         if sim != "REF":
             parameters = updateParameters(parameters, problem, simulation_matrix.loc[sim, :])
         parameters = runCustomPythonCode(problem.problem_folder, simulation_matrix.loc[sim, :], parameters)
@@ -46,7 +47,7 @@ def saveSimulationMatrix(problem):
     # First we create the dataframe based on the reference simulation
     full_simulation_matrix = saveReferenceParameterValues(problem)
     # Part 2: Other simulations
-    if "parametric" in problem.main["Analysis"]:
+    if "parametric" in problem.analysis:
         full_simulation_matrix = parametricSimulationMatrix(problem, full_simulation_matrix)
     #if "GSA" in problem["Main"]["Analysis"]:
         # problem, simulation_matrix = generateSensitivitySample(problem, simulation_matrix)
@@ -106,8 +107,7 @@ def writeProblemSets(problem):
                 objects.append({"name": object})
             output["1D"].append({"set_name": set_name, "slice_name": slice_name, "objects": objects})
     # Finally we write the data file with the sets information
-        with open(problem.optienea_folder + "problem_types\\" + problem.main[
-            "Problem type"] + "\\data_sets.mustache", "r") as f:
+        with open(problem.optienea_folder + "problem_types\\" + problem.problem_type + "\\data_sets.mustache", "r") as f:
             data_sets = chevron.render(f, output)
         with open(problem.sim_folder + "sets.dat", "w") as f:
             f.write(data_sets)
@@ -119,7 +119,7 @@ def writeProblemParameters(parameters, data, problem):
     This function is used to write the parameters of the problem into a .dat input file for GLPK
     """
     # First we read the data for 0-Dimensional parameters, i.e. single-value parameters
-    problem_type = problem.main["Problem type"]
+    problem_type = problem.problem_type
     output = dict()
     output["0D"] = list()
     for param_name, value in parameters["0"].items():
@@ -193,12 +193,96 @@ def runSimulation(problem, simname, counter, nsim_tot, elapsed_time):
     else:
         time_left = ": " + "{:.0f}".format((nsim_tot - counter + 1) * elapsed_time / (counter-1) / 60) + " minutes"
     print("Start sim. # " + str(counter) + " of " + str(nsim_tot) + ". Expected time left" + time_left)
-    if "Max sim time" in problem.main.keys():
-        subprocess.run(["glpsol", "-m", "..\\mod_file.mod", "-d", "..\\sets.dat", "-d", "parameters.dat", "-o",
-                    "output.out", "--log", "log.txt", "--tmlim", str(problem.main["Max sim time"])], stdout=subprocess.DEVNULL)
+
+    if problem.interpreter == "ampl":
+        solve_ampl_problem(problem, simname)
+    if problem.interpreter == "glpk":
+        solve_glpk_problem(problem.solver_options)
+
+    return None
+
+
+def solve_ampl_problem(problem, simname):
+    """
+    This function prepares the call for the optimization using AMPL
+    """
+    copyfile(problem.sim_folder + problem.filenames["runfile"], problem.temp_folder + simname + "\\" + problem.filenames["runfile"])
+    subprocess.run(["ampl", problem.filenames["runfile"]])
+    return None
+
+
+def solve_glpk_problem(solver_options):
+    """
+    This function prepares the call for the optimization using GLPK
+    """
+    run_list = ["glpsol", "-m", "..\\mod_file.mod", "-d", "..\\sets.dat", "-d", "parameters.dat", "--log", "log.txt"]
+    for option, value in solver_options.items():
+        run_list.append(option)
+        run_list.append(value)
+    subprocess.run(run_list, stdout=subprocess.DEVNULL)
+    return None
+
+def set_output(problem, simname):
+    """
+    This function serves the purpose of including in the mod or run file the required information for printing the output
+    """
+    output_structure = [
+        {"type": "indexed", "filename": "output_units.txt", "column_names": ["Size", "C_INV"], "var_names": ["size", "unitAnnualizedInvestmentCost"], "set": "nonmarketUtilities"},
+        {"type": "indexed", "filename": "output_economics.txt", "column_names": ["C_OP"], "var_names": ["layer_operating_cost"], "set": "marketLayers"},
+        {"type": "values", "filename": "output_KPIs.txt", "var_names": ["CAPEX", "OPEX", "obj"]}]
+    output_setup_string = ""
+    if problem.interpreter == "glpk":
+        output_setup_string += "\n \n solve; \n\n"
+    elif problem.interpreter == "ampl":
+        output_setup_string += "option solver " + problem.solver + ";\n"
+        output_setup_string += 'option ampl_include "' + problem.temp_folder + '";\n'
+        output_setup_string += "model mod_file.mod; \n"
+        output_setup_string += "data sets.dat;\n"
+        output_setup_string += 'option ampl_include "' + problem.temp_folder + simname + '\\";\n'
+        output_setup_string += "data parameters.dat; \n"
+        output_setup_string += "solve; \n\n"
     else:
-        subprocess.run(["glpsol", "-m", "..\\mod_file.mod", "-d", "..\\sets.dat", "-d", "parameters.dat", "-o",
-                        "output.out", "--log", "log.txt"], stdout=subprocess.DEVNULL)
+        raise ValueError ("The problem interpreter should be either 'glpk' or 'ampl'. " + problem.interpreter + " was provided instead.")
+    # Writing the actual output format
+    for output in output_structure:
+        # If the value is indexed over a set:
+        if output["type"] == "indexed":
+            output_setup_string += 'printf "%s' + ',%s'*len(output["column_names"]) + '\\n", "Name"'
+            for name in output["column_names"]:
+                output_setup_string += ', "' + name + '"'
+            output_setup_string += ' > "' + output["filename"] + '"; \n'
+            if problem.interpreter == "glpk":
+                output_setup_string += 'for {i in ' + output["set"] + '} {\n \t printf '
+            elif problem.interpreter == "ampl":
+                output_setup_string += 'printf {i in ' + output["set"] + '} \t '
+            output_setup_string += '"%s' + ',%.1f'*len(output["column_names"]) + '\\n", i'
+            for variable in output["var_names"]:
+                output_setup_string += ', ' + variable + "[i]"
+            output_setup_string += ' >> "' + output["filename"] + '" ;\n'
+            if problem.interpreter == "glpk":
+                output_setup_string += '}\n'
+            elif problem.interpreter == "ampl":
+                output_setup_string += '\n'
+        # If the values are simply a series of non-indexed values
+        elif output["type"] == "values":
+            output_setup_string += 'printf "%s,%s\\n", "Name", "Value" > "' + output["filename"] + '";\n'
+            output_setup_string += 'printf "' + '%s,%.1f\\n' * len(output["var_names"]) + '\\n"'
+            for variable in output["var_names"]:
+                output_setup_string += ', "' + variable + '", ' + variable
+            output_setup_string += ' >> "' + output["filename"] + '";\n\n\n'
+        else:
+            raise ValueError ("The output type should be either 'indexed' or 'value'. " + output["type"] + " was provided instead.")
+        # In the case of GLPK output syntax is added at the bottom of the mod file, in the case of AMPL in the runfile
+    if problem.interpreter == "glpk":
+        with open(problem.sim_folder + "mod_file.mod", "a") as mod_file:
+            mod_file.write(output_setup_string)
+    elif problem.interpreter == "ampl":
+        with open(problem.sim_folder + problem.filenames["runfile"], "w") as runfile:
+            runfile.write(output_setup_string)
+    # Finally we add the "end" at the end of the mod file
+    with open(problem.sim_folder + "mod_file.mod", "a") as mod_file:
+        mod_file.write("\nend;")
+
     return None
 
 
@@ -260,7 +344,7 @@ def updateRawParameter(parameters, parameter_tuple, simulation_data, problem):
     elif parameter_tuple[0] == "MaxPower":
         parameters["2"]["POWER_MAX"][parameter_tuple[1]][parameter_tuple[2]] = simulation_data[parameter_tuple]
     elif parameter_tuple[0] == "ActivationFrequency":
-        parameters["3"]["POWER_MAX_REL"][parameter_tuple[1]][parameter_tuple[2]] = setRelativeMaxPower(simulation_data[parameter_tuple], problem.main["General parameters"]["NT"])
+        parameters["3"]["POWER_MAX_REL"][parameter_tuple[1]][parameter_tuple[2]] = setRelativeMaxPower(simulation_data[parameter_tuple], problem.general_parameters["NT"])
     elif parameter_tuple[0] in problem.parameters["extra"].keys():
         pass  # The parameters will be updated in the custom python code
     else:

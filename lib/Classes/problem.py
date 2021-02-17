@@ -29,9 +29,11 @@ class Problem:
             self.sets = dict()
             self.main = dict()
             self.nSim = 0
+            self.interpreter = "glpk"  # The type of interpreter of the project. It can be either "ampl" or "glpk", the latter being the default value
+            self.solver = "glpsol"  # The type of interpreter of the project. It can be either "cplexamp" or "glpsol", the latter being the default value
+            self.solver_options = dict()
 
       def set_problem_folders(self, input_type):
-            date = datetime.now().strftime("%Y-%m-%d %Hh%M")
             # Set the folder of the "OptiENEA" toolbox, which is where this file is located
             self.optienea_folder = os.getcwd() + "\\"
             # Now reading where the other folders are.
@@ -50,19 +52,26 @@ class Problem:
             else:
                   raise ValueError("The value of the input_type should be either 'user' or 'file'")
             self.problem_folder = self.problem_folder + "\\"
-            self.sim_folder = self.problem_folder + self.name + "_" + date + "\\"
+            if self.temp_problem_folder is not None:
+                  self.temp_problem_folder = self.temp_problem_folder + "\\"
+
+      def set_sim_folder(self):
+            date = datetime.now().strftime("%Y-%m-%d %Hh%M")
+            sim_folder_addend = self.name + " - " + self.simulation_name + " - " + date + "\\"
+            self.sim_folder = self.problem_folder + sim_folder_addend
+            print(self.sim_folder)
             os.mkdir(self.sim_folder)
             # If the information about a temporary folder is given, we create it. Otherwise not
             if self.temp_problem_folder is not None:
-                  self.temp_problem_folder = self.temp_problem_folder + "\\"
-                  self.temp_folder = self.temp_problem_folder + self.name + "_" + date + "\\"
+                  self.temp_folder = self.temp_problem_folder + sim_folder_addend
                   os.mkdir(self.temp_folder)
 
       def parse_general_input_file(self):
             temp = read_input_from_file({}, self.problem_folder + "general.txt")
             for category, item in temp.items():
                   if category == "main":
-                        self.main = item
+                        #self.main = item
+                        self.__dict__.update(item)
                   elif category == "parameters":
                         self.parameters = item
                   elif category == "parametric":
@@ -73,12 +82,13 @@ class Problem:
                         raise(ValueError, "The provided input type in the general.txt file is not recognized")
 
       def parse_problem_units(self):
-            self.units = read_input_from_file({}, self.problem_folder + "units.txt")
+            self.units = read_input_from_file({}, self.problem_folder + self.filenames["units"])
+
 
       def parse_problem_sets(self):
             self.sets = {"0": dict(), "1": dict(), "2": dict()}
             self.sets["0"]["timeSteps"] = list(
-                  [str(i) for i in range(1, int(self.main["General parameters"]["NT"]) + 1)])
+                  [str(i) for i in range(1, int(self.general_parameters["NT"]) + 1)])
             self.sets = parse_sets(self.sets, self.units)
 
       def parse_problem_parameters(self):

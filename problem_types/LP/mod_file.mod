@@ -10,6 +10,7 @@ set layers;
 set layersOfUnit{u in units};
 set mainLayerOfUnit{u in units};
 set unitsOfLayer{l in layers} := setof{u in units : l in layersOfUnit[u]} u;
+set marketLayers := setof{u in markets, l in layersOfUnit[u]} l;
 
 set chargingUtilitiesOfStorageUnit{u in storageUnits} within utilities;
 set dischargingUtilitiesOfStorageUnit{u in storageUnits} within utilities;
@@ -57,7 +58,7 @@ var CAPEX;
 var OPEX;
 
 
-minimize total_annualized_cost: CAPEX + OPEX;
+minimize obj: CAPEX + OPEX;
 
 s.t. calculate_capex: CAPEX = sum{u in utilities} unitAnnualizedInvestmentCost[u]; 
 
