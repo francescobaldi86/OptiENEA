@@ -1,2 +1,0 @@
-Main; "D:\\Dropbox\\Condivisa Coraddu-Collu-Baldi\\Ottimizzatore\\GLPK\\AmmoniaProblem"
-Temp; "C:\\Users\\andre\\Documents\\ENEA\\Progetto Ammonia"
