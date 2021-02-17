@@ -22,7 +22,8 @@ def parametricSimulationMatrix(problem, simulation_matrix):
     list_of_parametric_fields = {"0": {}, "1": {}}  # Create a list of all parameters that are considered as parametric
     for level, parameter_list in problem.parametric.items():
         for param_name, param_data in parameter_list.items():
-            list_of_parametric_fields[level][convertFieldNames(param_name, mode = "string2tuple")] = readParametricValues(problem.parametric[level][param_name])
+            if level in {"0", "1"}:
+                list_of_parametric_fields[level][convertFieldNames(param_name, mode = "string2tuple")] = readParametricValues(problem.parametric[level][param_name])
 
     # Assign field values to the dataframe
     output = pd.DataFrame(columns=list(list_of_parametric_fields["0"]) + list(list_of_parametric_fields["1"]))
@@ -38,7 +39,20 @@ def parametricSimulationMatrix(problem, simulation_matrix):
                 else:
                     dataframe[par0_name__] = simulation_matrix.loc["REF", par0_name__]  # If this is not the "selected" item,
             output = output.append(dataframe)
+    # Assign other fields
     output = assignOtherFields(simulation_matrix, output)
+    # Assign fields categorized as "E" (Equal)
+    if "E" in problem.parametric:
+        for param_name_destination, param_name_source in problem.parametric["E"].items():
+            output[convertFieldNames(param_name_destination, mode = "string2tuple")] = output[convertFieldNames(param_name_source, mode = "string2tuple")]
+    if "M" in problem.parametric:
+        for param_name_destination, content in problem.parametric["M"].items():
+            for param_name_source, dictionary in content.items():
+                for idx in output.index:
+                    output.at[idx, convertFieldNames(param_name_destination, mode = "string2tuple")] = dictionary[output.at[idx, convertFieldNames(param_name_source, mode = "string2tuple")]]
+
+
+
     output = pd.concat((simulation_matrix, output))
 
     return output.drop_duplicates()
