@@ -16,8 +16,8 @@ import lib.Functions.GUI as GUI
 
 class Problem:
       # Initialization function
-      def __init__(self, name):
-            self.name = name
+      def __init__(self):
+            self.name = None
             self.problem_folder = None
             self.sim_folder = None
             self.optienea_folder = None
@@ -33,24 +33,22 @@ class Problem:
             self.solver = "glpsol"  # The type of interpreter of the project. It can be either "cplexamp" or "glpsol", the latter being the default value
             self.solver_options = dict()
 
-      def set_problem_folders(self, input_type):
+      def set_problem_name(self):
             # Set the folder of the "OptiENEA" toolbox, which is where this file is located
             self.optienea_folder = os.getcwd() + "\\"
-            # Now reading where the other folders are.
-            if input_type == "user":
-                  self.problem_folder, self.temp_problem_folder = GUI.get_problem_directories()
-            elif input_type == "file":
-                  temp = dict()
-                  try:
-                        temp = read_input_from_file(temp, self.optienea_folder + self.name + ".txt")
-                  except FileNotFoundError:
-                        temp_file = GUI.get_problem_general_file_folder()
-                  finally:
-                        self.problem_folder = temp["Main"]
-                        if "Temp" in temp.keys():
-                              self.temp_problem_folder = temp["Temp"]
+            found = False
+            for file in os.listdir(self.optienea_folder + "Problems"):
+                  if file.endswith(".txt"):
+                        if file.startswith("UP_"):
+                              self.name = file[3:-4]
+                              found = True
+            if found:
+                  temp = read_input_from_file(dict(), self.optienea_folder + "Problems\\UP_" + self.name + ".txt")
+                  self.problem_folder = temp["Main"]
+                  if "Temp" in temp.keys():
+                        self.temp_problem_folder = temp["Temp"]
             else:
-                  raise ValueError("The value of the input_type should be either 'user' or 'file'")
+                  self.problem_folder, self.temp_problem_folder = GUI.get_problem_directories()
             self.problem_folder = self.problem_folder + "\\"
             if self.temp_problem_folder is not None:
                   self.temp_problem_folder = self.temp_problem_folder + "\\"

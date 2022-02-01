@@ -10,12 +10,11 @@ This is the main script of the "OptiENEA" toolbox for the linear optimization of
 import os
 from lib.Functions.simulationManager import simulationManager
 from lib.Classes.problem import Problem
-from lib.Functions.helpers import problemIdentifier
 from winsound import Beep
 
 def main():
-    problem = Problem(problemIdentifier())
-    problem.set_problem_folders("file")
+    problem = Problem()
+    problem.set_problem_name()
     problem.parse_general_input_file()
     problem.set_sim_folder()
     problem.parse_problem_units()
