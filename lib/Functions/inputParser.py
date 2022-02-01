@@ -80,11 +80,13 @@ def parse_parameters(problem):
                 temp = pd.read_csv(problem.problem_folder + name + ".csv", index_col=0)
                 for col in temp.keys():
                     ENERGY_PRICE_VARIATION[col] = temp[col].to_dict()
+					
         if unit["Type"] == "Storage":
             CRATE[name], ERATE[name], = float(unit["Rates"][0]), float(unit["Rates"][1])
             ENERGY_MAX[name] = float(unit["MaxEnergy"])
             SPECIFIC_INVESTMENT_COST_ANNUALIZED[name] = calculateAnnualizedInvestmentCost(
                 unit["InvestmentCost"], unit["Lifetime"], problem.general_parameters["InterestRate"])
+				
         if unit["Type"] == "Process":
             temp = unit["Power"]
             if temp == "file":
