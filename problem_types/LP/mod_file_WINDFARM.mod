@@ -40,7 +40,7 @@ param TIME_STEP_DURATION;
 param OCCURRANCE;
 
 /* Cost-related parameters */
-param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in nonmarketUtilities} default 0;  # It is the annualized cost
+param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;  # It is the annualized cost
 param ENERGY_AVERAGE_PRICE{l in layers} default 0;
 param ENERGY_PRICE_VARIATION{l in layers, t in timeSteps} default 1;
 
@@ -49,8 +49,8 @@ param ENERGY_PRICE_VARIATION{l in layers, t in timeSteps} default 1;
 var power{u in units, l in layersOfUnit[u], t in timeSteps};
 var energyStorageLevel{u in storageUnits, l in layersOfUnit[u], t in timeSteps} >=0;
 var energyStorageLevel0{u in storageUnits, l in layersOfUnit[u]} >=0;
-var unitAnnualizedInvestmentCost{u in nonmarketUtilities} >= 0;
-var layer_operating_cost{l in marketLayers} ;
+var unitAnnualizedInvestmentCost{u in units} >= 0;
+var layer_operating_cost{l in layersOfUnit["Market"]} ;
 var ics{u in nonmarketUtilities, t in timeSteps} >= 0, <= 1;
 var size{u in nonmarketUtilities} >= 0;
 
@@ -72,12 +72,13 @@ s.t. calculate_operating_cost{u in markets, l in layersOfUnit[u]}: layer_operati
 s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;
 
 s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t]; 
-s.t. sale_to_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] < 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;
-s.t. purchase_from_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] > 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] >= power[u,l,t] >= 0;
+s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;
 
 s.t. componentSizing{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps}: size[u] >= ics[u,t] * abs(POWER_MAX[u,l]); 
 
 s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = POWER[p,l,t];
+
+
 
 # Storage equations	
 s.t. storage_balance{u in storageUnits, l in layersOfUnit[u], t in timeSteps}: energyStorageLevel[u,l,t] = (if t == 1 
@@ -110,3 +111,4 @@ s.t. charging_power_only_positive{u in storageUnits, l in layersOfUnit[u], ch in
 	power[ch,l,t] >= 0; 
 s.t. discharging_power_only_negative{u in storageUnits, l in layersOfUnit[u], dis in dischargingUtilitiesOfStorageUnit[u], t in timeSteps}: 
 	power[dis,l,t] <= 0; 
+end;
