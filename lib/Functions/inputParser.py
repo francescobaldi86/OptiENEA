@@ -69,6 +69,12 @@ def parse_parameters(problem):
                 if "ActivationFrequency" in unit.keys():
                     POWER_MAX_REL[name][sets["1"]["layersOfUnit"][name][idx]] = setRelativeMaxPower(
                         unit["ActivationFrequency"][idx], problem.general_parameters["NT"])
+                if "TimeDependentAvailability" in unit.keys():
+                    if unit["TimeDependentAvailability"] == "file":
+                        temp = pd.read_csv(problem.problem_folder + name + ".csv", index_col=0)
+                        for lay in temp.keys():
+                            POWER_MAX_REL[name][lay] = temp[lay].to_dict()   # Useful, for instance, in the case of solar panels and wind turbines. The input file must contain a vector representing the ratio between the maximum power generation at time step t over the reference output.     
+
 
         if unit["Type"] == "Market": # This is only for units of type "Market"
             POWER_MAX[name] = dict()
