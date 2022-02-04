@@ -73,13 +73,15 @@ def parse_parameters(problem):
         if unit["Type"] == "Market": # This is only for units of type "Market"
             POWER_MAX[name] = dict()
             POWER_MAX_REL[name] = dict()
+            ENERGY_AVERAGE_PRICE[name] = dict()
             for idx in range(len(sets["1"]["layersOfUnit"][name])):
                 POWER_MAX[name][sets["1"]["layersOfUnit"][name][idx]] = unit["MaxPower"][idx]
-                ENERGY_AVERAGE_PRICE[sets["1"]["layersOfUnit"][name][idx]] = float(unit["AveragePrice"][idx])
+                ENERGY_AVERAGE_PRICE[name][sets["1"]["layersOfUnit"][name][idx]] = float(unit["AveragePrice"][idx])
             if unit["TimeDependentPrice"] == "file":
+                ENERGY_PRICE_VARIATION[name] = dict()
                 temp = pd.read_csv(problem.problem_folder + name + ".csv", index_col=0)
                 for col in temp.keys():
-                    ENERGY_PRICE_VARIATION[col] = temp[col].to_dict()
+                    ENERGY_PRICE_VARIATION[name][col] = temp[col].to_dict()
 					
         if unit["Type"] == "Storage":
             CRATE[name], ERATE[name], = float(unit["Rates"][0]), float(unit["Rates"][1])
@@ -93,12 +95,28 @@ def parse_parameters(problem):
                 POWER[name] = dict()
                 temp = pd.read_csv(problem.problem_folder + name + ".csv", index_col=0)
                 for lay in temp.keys():
-                    POWER[name][lay] = temp[lay].to_dict()
+                    if "ProcessType" in unit.keys():
+                        if unit["ProcessType"] == "Demand":
+                            # If the process is of type "demand", we must ensure that all its values are <= 0
+                            if all(temp[lay] <= 0):
+                                POWER[name][lay] = temp[lay].to_dict()  # Just a check: if all values are negative, we do nothing 
+                            elif all(temp[lay] >= 0):
+                                POWER[name][lay] = (-temp[lay]).to_dict()  # If all values are positive, we simply multiply all of them by -1
+                            else:
+                                raise Exception("There is a problem with process unit " + name + " that should be of type 'Demand', but has both positive and negative input values")
+                        elif unit["ProcessType"] == "Generation":
+                            # If the process is of type "generation", we must ensure that all its values are >= 0
+                            if all(temp[lay] >= 0):
+                                POWER[name][lay] = temp[lay].to_dict()  # Just a check: if all values are positive, we do nothing 
+                            elif all(temp[lay] <= 0):
+                                POWER[name][lay] = (-temp[lay]).to_dict()  # If all values are negative, we simply multiply all of them by -1
+                            else:
+                                raise Exception("There is a problem with process unit " + name + " that should be of type 'Generation', but has both positive and negative input values")
             else:
                 POWER[name] = temp
+
     parameters["1"].update({
-        "CRATE": CRATE, "ERATE": ERATE, "ENERGY_MAX": ENERGY_MAX,
-        "ENERGY_AVERAGE_PRICE": ENERGY_AVERAGE_PRICE, "SPECIFIC_INVESTMENT_COST_ANNUALIZED": SPECIFIC_INVESTMENT_COST_ANNUALIZED})
-    parameters["2"].update({"POWER_MAX": POWER_MAX, "ENERGY_PRICE_VARIATION": ENERGY_PRICE_VARIATION})
-    parameters["3"].update({"POWER": POWER, "POWER_MAX_REL": POWER_MAX_REL})
+        "CRATE": CRATE, "ERATE": ERATE, "ENERGY_MAX": ENERGY_MAX, "SPECIFIC_INVESTMENT_COST_ANNUALIZED": SPECIFIC_INVESTMENT_COST_ANNUALIZED})
+    parameters["2"].update({"POWER_MAX": POWER_MAX, "ENERGY_AVERAGE_PRICE": ENERGY_AVERAGE_PRICE})
+    parameters["3"].update({"POWER": POWER, "POWER_MAX_REL": POWER_MAX_REL, "ENERGY_PRICE_VARIATION": ENERGY_PRICE_VARIATION})
     return parameters

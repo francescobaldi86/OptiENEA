@@ -38,7 +38,7 @@ def parametricSimulationMatrix(problem, simulation_matrix):
                     dataframe[par0_name__] = par0_values[id_par0]
                 else:
                     dataframe[par0_name__] = simulation_matrix.loc["REF", par0_name__]  # If this is not the "selected" item,
-            output = output.append(dataframe)
+            output = pd.concat([output, dataframe])
     # Assign other fields
     output = assignOtherFields(simulation_matrix, output)
     # Assign fields categorized as "E" (Equal)

@@ -228,21 +228,65 @@ def set_output(problem, simname):
     """
     output_structure = [
         {"type": "indexed", "filename": "output_units.txt", "column_names": ["Size", "C_INV"], "var_names": ["size", "unitAnnualizedInvestmentCost"], "set": "nonmarketUtilities"},
-        {"type": "indexed", "filename": "output_economics.txt", "column_names": ["C_OP"], "var_names": ["layer_operating_cost"], "set": "marketLayers"},
+        {"type": "indexed", "filename": "output_economics.txt", "column_names": ["C_OP"], "var_names": ["layer_operating_cost"], "set": "outputMarketLayers", "setdim": 2},
         {"type": "values", "filename": "output_KPIs.txt", "var_names": ["CAPEX", "OPEX", "obj"]}]
-    output_setup_string = ""
     if problem.interpreter == "glpk":
-        output_setup_string += "\n \n solve; \n\n"
+        writePrintfStatementsForGlpk(output_structure, problem.sim_folder)
     elif problem.interpreter == "ampl":
-        output_setup_string += "option solver " + problem.solver + ";\n"
-        output_setup_string += 'option ampl_include "' + problem.temp_folder + '";\n'
-        output_setup_string += "model mod_file.mod; \n"
-        output_setup_string += "data sets.dat;\n"
-        output_setup_string += 'option ampl_include "' + problem.temp_folder + simname + '\\";\n'
-        output_setup_string += "data parameters.dat; \n"
-        output_setup_string += "solve; \n\n"
-    else:
-        raise ValueError ("The problem interpreter should be either 'glpk' or 'ampl'. " + problem.interpreter + " was provided instead.")
+        writePrintfStatementsForAmpl(output_structure, problem, simname)
+
+    return None
+
+
+def writePrintfStatementsForGlpk(output_structure, sim_folder):
+    output_setup_string = ""
+    output_setup_string += "\n \n solve; \n\n"
+    for output in output_structure:
+    # If the value is indexed over a set:
+        if output["type"] == "indexed":
+            output_setup_string += 'printf "%s' + ',%s'*len(output["column_names"]) + '\\n", "Name"'
+            for name in output["column_names"]:
+                output_setup_string += ', "' + name + '"'
+            output_setup_string += ' > "' + output["filename"] + '"; \n'
+            if "setdim" not in output.keys():
+                output_setup_string += 'for {i in ' + output["set"] + '} {\n \t printf '
+            else:
+                output_setup_string += 'for {(i,j) in ' + output["set"] + '} {\n \t printf '
+            if "setdim" not in output.keys():
+                output_setup_string += '"%s' + ',%.1f'*len(output["column_names"]) + '\\n", i'
+            else:
+                output_setup_string += '"%s:%s' + ',%.1f'*len(output["column_names"]) + '\\n", i,j'
+            for variable in output["var_names"]:
+                if "setdim" not in output.keys():
+                    output_setup_string += ', ' + variable + "[i]"
+                else:
+                    output_setup_string += ', ' + variable + "[i,j]"
+            output_setup_string += ' >> "' + output["filename"] + '" ;\n'
+            output_setup_string += '}\n'
+        # If the values are simply a series of non-indexed values
+        elif output["type"] == "values":
+            output_setup_string += 'printf "%s,%s\\n", "Name", "Value" > "' + output["filename"] + '";\n'
+            output_setup_string += 'printf "' + '%s,%.1f\\n' * len(output["var_names"]) + '\\n"'
+            for variable in output["var_names"]:
+                output_setup_string += ', "' + variable + '", ' + variable
+            output_setup_string += ' >> "' + output["filename"] + '";\n\n\n'
+        else:
+            raise ValueError ("The output type should be either 'indexed' or 'value'. " + output["type"] + " was provided instead.")
+    # In the case of GLPK output syntax is added at the bottom of the mod file, in the case of AMPL in the runfile
+    with open(sim_folder + "mod_file.mod", "a") as mod_file:
+        mod_file.write(output_setup_string)
+    
+    return None
+
+def writePrintfStatementsForAmpl(output_structure, problem, simname):
+    output_setup_string = ""
+    output_setup_string += "option solver " + problem.solver + ";\n"
+    output_setup_string += 'option ampl_include "' + problem.temp_folder + '";\n'
+    output_setup_string += "model mod_file.mod; \n"
+    output_setup_string += "data sets.dat;\n"
+    output_setup_string += 'option ampl_include "' + problem.temp_folder + simname + '\\";\n'
+    output_setup_string += "data parameters.dat; \n"
+    output_setup_string += "solve; \n\n"
     # Writing the actual output format
     for output in output_structure:
         # If the value is indexed over a set:
@@ -251,18 +295,15 @@ def set_output(problem, simname):
             for name in output["column_names"]:
                 output_setup_string += ', "' + name + '"'
             output_setup_string += ' > "' + output["filename"] + '"; \n'
-            if problem.interpreter == "glpk":
-                output_setup_string += 'for {i in ' + output["set"] + '} {\n \t printf '
-            elif problem.interpreter == "ampl":
-                output_setup_string += 'printf {i in ' + output["set"] + '} \t '
+            output_setup_string += 'printf {i in ' + output["set"] + '} \t '
             output_setup_string += '"%s' + ',%.1f'*len(output["column_names"]) + '\\n", i'
             for variable in output["var_names"]:
-                output_setup_string += ', ' + variable + "[i]"
+                if "setdim" not in output.keys():
+                    output_setup_string += ', ' + variable + "[i]"
+                else:
+                    output_setup_string += ', ' + variable + "[i,j]"
             output_setup_string += ' >> "' + output["filename"] + '" ;\n'
-            if problem.interpreter == "glpk":
-                output_setup_string += '}\n'
-            elif problem.interpreter == "ampl":
-                output_setup_string += '\n'
+            output_setup_string += '\n'
         # If the values are simply a series of non-indexed values
         elif output["type"] == "values":
             output_setup_string += 'printf "%s,%s\\n", "Name", "Value" > "' + output["filename"] + '";\n'
@@ -273,17 +314,14 @@ def set_output(problem, simname):
         else:
             raise ValueError ("The output type should be either 'indexed' or 'value'. " + output["type"] + " was provided instead.")
         # In the case of GLPK output syntax is added at the bottom of the mod file, in the case of AMPL in the runfile
-    if problem.interpreter == "glpk":
-        with open(problem.sim_folder + "mod_file.mod", "a") as mod_file:
-            mod_file.write(output_setup_string)
-    elif problem.interpreter == "ampl":
-        with open(problem.sim_folder + problem.filenames["runfile"], "w") as runfile:
-            runfile.write(output_setup_string)
+    with open(problem.sim_folder + problem.filenames["runfile"], "w") as runfile:
+        runfile.write(output_setup_string)
     # Finally we add the "end" at the end of the mod file
     with open(problem.sim_folder + "mod_file.mod", "a") as mod_file:
         mod_file.write("\nend;")
-
+    
     return None
+
 
 
 def runCustomPythonCode(main_folder, simulation_data, parameters):

@@ -90,7 +90,7 @@ class Problem:
             self.sets = parse_sets(self.sets, self.units)
 
       def parse_problem_parameters(self):
-            for level in ["0", "1", "2", "3"]:
+            for level in ["0", "1", "2", "3", "extra"]:
                   if level not in self.parameters.keys():
                         self.parameters[level] = dict()
             self.parameters = parse_parameters(self)

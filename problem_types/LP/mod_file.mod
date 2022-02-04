@@ -11,6 +11,7 @@ set layersOfUnit{u in units};
 set mainLayerOfUnit{u in units};
 set unitsOfLayer{l in layers} := setof{u in units : l in layersOfUnit[u]} u;
 set marketLayers := setof{u in markets, l in layersOfUnit[u]} l;
+set outputMarketLayers := setof{u in markets, l in layersOfUnit[u]} (u, l);
 
 set chargingUtilitiesOfStorageUnit{u in storageUnits} within utilities;
 set dischargingUtilitiesOfStorageUnit{u in storageUnits} within utilities;
@@ -41,8 +42,8 @@ param OCCURRANCE;
 
 /* Cost-related parameters */
 param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in nonmarketUtilities} default 0;  # It is the annualized cost
-param ENERGY_AVERAGE_PRICE{l in layers} default 0;
-param ENERGY_PRICE_VARIATION{l in layers, t in timeSteps} default 1;
+param ENERGY_AVERAGE_PRICE{u in markets, l in layersOfUnit[u]} default 0;
+param ENERGY_PRICE_VARIATION{u in markets, l in layersOfUnit[u], t in timeSteps} default 1;
 
 
 /* Defining the variables */
@@ -50,7 +51,7 @@ var power{u in units, l in layersOfUnit[u], t in timeSteps};
 var energyStorageLevel{u in storageUnits, l in layersOfUnit[u], t in timeSteps} >=0;
 var energyStorageLevel0{u in storageUnits, l in layersOfUnit[u]} >=0;
 var unitAnnualizedInvestmentCost{u in nonmarketUtilities} >= 0;
-var layer_operating_cost{l in marketLayers} ;
+var layer_operating_cost{(u,l) in outputMarketLayers} ;
 var ics{u in nonmarketUtilities, t in timeSteps} >= 0, <= 1;
 var size{u in nonmarketUtilities} >= 0;
 
@@ -60,14 +61,13 @@ var OPEX;
 
 minimize obj: CAPEX + OPEX;
 
-s.t. calculate_capex: CAPEX = sum{u in utilities} unitAnnualizedInvestmentCost[u]; 
+s.t. calculate_capex: CAPEX = sum{u in nonmarketUtilities} unitAnnualizedInvestmentCost[u]; 
 
-s.t. calculate_opex: OPEX = sum{u in markets, l in layersOfUnit[u]} layer_operating_cost[l] ;
+s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l] ;
 
 s.t. calculate_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];
 
-# s.t. calculate_operating_cost{l in layersOfUnit["Market"]}: layer_operating_cost[l] = sum{t in timeSteps} (power["Market",l,t] * ENERGY_AVERAGE_PRICE[l] * (ALPHA[l] * sum{t1 in timeSteps}(POWER["WindFarm", "Electricity", t1]) / card(timeSteps) / POWER["WindFarm", "Electricity", t] + (1-ALPHA[l]) * ENERGY_PRICE_VARIATION[l,t])) * TIME_STEP_DURATION * OCCURRANCE;
-s.t. calculate_operating_cost{u in markets, l in layersOfUnit[u]}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[l] * ENERGY_PRICE_VARIATION[l,t]) * TIME_STEP_DURATION * OCCURRANCE;
+s.t. calculate_operating_cost{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;
 
 s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;
 
