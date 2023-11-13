@@ -38,16 +38,16 @@ class Problem:
             """
             Class method that simply runs the model as a whole. Useful once everything is set up to run things quickly
             """
-            self.create_folders  # Creates the project folders
-            self.read_problem_data  # Reads problem general data and data about units
-            self.process_problem_data  # Uses the problem data read before and saves them in the appropriate format
-            self.generate_amplpy_problem  # Uses the data to create the amplpy problem
-            self.create_model_file  # Creates the problem mod file
-            self.create_data_file  # Creates the problem data file
-            self.solve  # Solves the optimization problem
-            self.read_output  # Reads the output generated 
-            self.save_output  # Saves the output into useful and readable data structures
-            self.generate_plots  # Generates required figures
+            self.create_folders()  # Creates the project folders
+            self.read_problem_data()  # Reads problem general data and data about units
+            self.process_problem_data()  # Uses the problem data read before and saves them in the appropriate format
+            self.generate_amplpy_problem()  # Uses the data to create the amplpy problem
+            self.create_model_file()  # Creates the problem mod file
+            self.create_data_file()  # Creates the problem data file
+            self.solve()  # Solves the optimization problem
+            self.read_output()  # Reads the output generated 
+            self.save_output()  # Saves the output into useful and readable data structures
+            self.generate_plots()  # Generates required figures
 
 
       def create_folders(self):
@@ -73,14 +73,18 @@ class Problem:
             Processes the problem data read by read_problem_data (which is basically a multi-level dictionary)
             Units and general are read separately
             """
+            # Processing general data
+            self.problem_parameters = ProblemParameters(self.problem_data.general_data)
             # Processing units data
             for unit_name, unit_info in self.problem_data.unit_data.items():
-                  self.units.append(Unit.load_unit(unit_name, unit_info))
+                  new_unit = Unit.load_unit(unit_name, unit_info)
+                  new_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)
+                  self.units.append()
             # Checking for storage units and add related auxiliary units
-            for unit in self.Units:
+            for unit in self.units:
                   if isinstance(unit, StorageUnit):
                         self.units = self.units + unit.create_auxiliary_units()
-            # Processing general data
+            
 
 
       def parse_general_input_file(self):

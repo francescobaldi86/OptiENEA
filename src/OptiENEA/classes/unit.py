@@ -2,10 +2,11 @@ class Unit:
     """
     Units are the basic obejct in OptiENEA. Every unit has a number of attributes
     """
-    def __init__(self, name):
-        self.name = name
-        self.layers = []
-        self.mainLayer = None
+    def __init__(self, name, info):
+        self.name: str = name
+        self.type = info['type']
+        self.layers: list = info['Layers'] if isinstance(info['Layers'], list) else [info['Layers']]
+        self.mainLayer: str = info['MainLayer'] | self.layers[0]
     
     @staticmethod
     def load_unit(name: str, info: dict):
@@ -21,14 +22,24 @@ class Unit:
                     case 'Market':
                         return Market(name, info)
 
+    def calculate_annualized_capex(self, interest_rate):
+        # Calculates the annualized capital cost (specific) for each unit
+        if self.type == 'Process':
+            self.specific_annualized_capex = 0.0
+        if isinstance(self.specific_capex, list):
+            # If the data about the specific capex is a list, the calculation is done differently
+            self.specific_annualized_capex = sum([Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) * self.specific_capex[i] for i in range(len(self.lifetime))])
+        else:
+            self.specific_annualized_capex = Utility.calculate_annualization_factor(self.lifetime, interest_rate) * self.specific_capex
+
 
 
 class Process(Unit):
     """
     The process is a subclass of Unit. It models a unit for which the power is fixed
     """
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, info):
+        super().__init__(name, info)
         self.power = []
 
 class Utility(Unit):
@@ -40,17 +51,9 @@ class Utility(Unit):
         super().__init__(name)
         self.specific_capex: float | list = info['InvestmentCost'] | 0.01
         self.lifetime: int | list = info['Lifetime'] | 20
-        self.specific_annualized_capex = 0
-        self.specific_opex = 0
-        self.power_max = []
-    
-    def calculate_annualized_capex(self, interest_rate):
-        # Calculates the annualized capital cost (specific) for each unit
-        if isinstance(self.specific_capex, list):
-            # If the data about the specific capex is a list, the calculation is done differently
-            self.specific_annualized_capex = sum([Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) * self.specific_capex[i] for i in range(len(self.lifetime))])
-        else:
-            self.specific_annualized_capex = Utility.calculate_annualization_factor(self.lifetime, interest_rate) * self.specific_capex
+        self.specific_annualized_capex: float = 0.0
+        self.specific_opex: float = 0.0
+        self.power_max: list[float] = info['MaxPower'] if isinstance(info['MaxPower'], list) else [info['MaxPower']]
     
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
@@ -63,12 +66,12 @@ class StorageUnit(Utility):
         self.capacity = info['Capacity']
         self.charging_efficiency: float = info['ChargingEfficiency'] | 1.0
         self.discharging_efficiency: float = info['DischargingEfficiency'] | 1.0
-        self.c_rate = 1
-        self.e_rate = 1
-        self.charging_energy_layer: str | None = None
+        self.c_rate: float = info['Rates'][0] | 1.0
+        self.e_rate = info['Rates'][1] | 1.0
+        self.charging_energy_layer: str = info['Layers']
         self.main_layer: str | None = None
-        self.charging_unit: str | None = f'{name}Charger'
-        self.discharging_unit: str | None = f'{name}Disharger'
+        self.charging_unit: str = info['ChargingUnitName'] | f'{name}Charger'
+        self.discharging_unit: str | None = info['DischargingUnitName'] | f'{name}Disharger'
     
     def create_auxiliary_units(self) -> list:
         # Creates the auxiliary (charging and discharging) units
@@ -78,7 +81,7 @@ class StorageUnit(Utility):
 
     def create_charging_unit_info(self) -> dict:
         info = {}
-        info['Name'] = f'{self.name}Charger'
+        info['Name'] = self.charging_unit
         info['Layers'] = self.layers
         main_layer = self.main_layer | self.layers[0].replace('Stored', '')
         info['Layers'].append(main_layer)
@@ -94,7 +97,7 @@ class StorageUnit(Utility):
 
     def create_discharging_unit_info(self) -> dict:
         info = {}
-        info['Name'] = f'{self.name}Charger'
+        info['Name'] = self.discharging_unit
         max_power = self.capacity * self.e_rate
         info['MaxPower'] = [-max_power, max_power]
         info['Layers'] = self.layers
