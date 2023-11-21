@@ -26,12 +26,12 @@ class Problem:
             self.name = name
             self.problem_folder = problem_folder
             self.temp_folder = temp_folder
-            self.units: [Unit] | None = None
+            self.units: list[Unit] | None = None
             self.parameters: ProblemParameters | None = None
             self.problem_data: ProblemData | None = None
             self.objective: Objective | None
             self.constraints: [Constraint] | None = None
-            self.layers: [Layer] | None = None
+            self.layers: set[Layer] | None = None
             # self.parametric = dict()
 
       def full_run(self):
@@ -84,23 +84,16 @@ class Problem:
             for unit in self.units:
                   if isinstance(unit, StorageUnit):
                         self.units = self.units + unit.create_auxiliary_units()
+            # Add problem layers
+            for unit in self.units:
+                  self.layers.union(unit.parse_layers())
+            # Add problem objective function
+            self.set_objective_function()
+            # Add problem constraints
+            self.set_constraints()
+
             
 
-
-      def parse_general_input_file(self):
-            temp = read_input_from_file({}, self.problem_folder + "general.txt")
-            for category, item in temp.items():
-                  if category == "main":
-                        #self.main = item
-                        self.__dict__.update(item)
-                  elif category == "parameters":
-                        self.parameters = item
-                  elif category == "parametric":
-                        self.parametric.update(item)
-                  elif category == "filenames":
-                        self.filenames = item
-                  else:
-                        raise(ValueError, "The provided input type in the general.txt file is not recognized")
 
 
       def parse_problem_sets(self):

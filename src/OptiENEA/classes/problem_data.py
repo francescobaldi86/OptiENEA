@@ -7,7 +7,6 @@ class ProblemData:
     def __init__(self):
         self.unit_data: dict | None = None
         self.general_data: dict | None = None
-        return self
     
     def read_unit_data(self, problem_folder):
         self.unit_data = read_input_from_file(f'{problem_folder}\\units.txt')

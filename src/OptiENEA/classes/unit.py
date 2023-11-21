@@ -1,3 +1,5 @@
+from layer import Layer
+
 class Unit:
     """
     Units are the basic obejct in OptiENEA. Every unit has a number of attributes
@@ -22,15 +24,13 @@ class Unit:
                     case 'Market':
                         return Market(name, info)
 
-    def calculate_annualized_capex(self, interest_rate):
-        # Calculates the annualized capital cost (specific) for each unit
-        if self.type == 'Process':
-            self.specific_annualized_capex = 0.0
-        if isinstance(self.specific_capex, list):
-            # If the data about the specific capex is a list, the calculation is done differently
-            self.specific_annualized_capex = sum([Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) * self.specific_capex[i] for i in range(len(self.lifetime))])
-        else:
-            self.specific_annualized_capex = Utility.calculate_annualization_factor(self.lifetime, interest_rate) * self.specific_capex
+
+    def parse_layers(self):
+        # This method parses the unit's layers and assigns them to a set of "Layer" objects
+        output = set()
+        for layer_name in self.layers:
+            output.add(Layer(layer_name))
+        return output
 
 
 
@@ -48,8 +48,8 @@ class Utility(Unit):
     or not be, installed
     """
     def __init__(self, name, info):
-        super().__init__(name)
-        self.specific_capex: float | list = info['InvestmentCost'] | 0.01
+        super().__init__(name, info)
+        self.specific_capex: float | list = info['InvestmentCost'] | 0.0
         self.lifetime: int | list = info['Lifetime'] | 20
         self.specific_annualized_capex: float = 0.0
         self.specific_opex: float = 0.0
@@ -60,9 +60,17 @@ class Utility(Unit):
         # Calculates the annualization factor
         return ((interest_rate + 1)**lifetime - 1) / (interest_rate * (1 + interest_rate)**lifetime)
 
+    def calculate_annualized_capex(self, interest_rate):
+        # Calculates the annualized capital cost (specific) for each unit
+        if isinstance(self.specific_capex, list):
+            # If the data about the specific capex is a list, the calculation is done differently
+            self.specific_annualized_capex = sum([Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) * self.specific_capex[i] for i in range(len(self.lifetime))])
+        else:
+            self.specific_annualized_capex = Utility.calculate_annualization_factor(self.lifetime, interest_rate) * self.specific_capex
+
 class StorageUnit(Utility):
     def __init__(self, name, info):
-        super().__init__(name)
+        super().__init__(name, info)
         self.capacity = info['Capacity']
         self.charging_efficiency: float = info['ChargingEfficiency'] | 1.0
         self.discharging_efficiency: float = info['DischargingEfficiency'] | 1.0
@@ -108,6 +116,6 @@ class StorageUnit(Utility):
         return info
 
 class Market(Utility):
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, info):
+        super().__init__(name, info)
         self.activation_delay = []
