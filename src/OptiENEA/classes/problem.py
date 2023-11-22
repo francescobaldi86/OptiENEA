@@ -9,12 +9,14 @@ This file describes the classes of the OptiENEA tool
 """
 import os
 from datetime import datetime
+from amplpy import AMPL
 from unit import Unit, StorageUnit
 from problem_parameters import ProblemParameters
 from problem_data import ProblemData
 from objective import Objective
 from constraint import Constraint
 from layer import Layer
+from amplpy import AmplMod
 
 class Problem:
       # Initialization function
@@ -41,7 +43,7 @@ class Problem:
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
             self.process_problem_data()  # Uses the problem data read before and saves them in the appropriate format
-            self.generate_amplpy_problem()  # Uses the data to create the amplpy problem
+            # self.generate_amplpy_problem()  # Uses the data to create the amplpy problem
             self.create_model_file()  # Creates the problem mod file
             self.create_data_file()  # Creates the problem data file
             self.solve()  # Solves the optimization problem
@@ -89,10 +91,29 @@ class Problem:
                   self.layers.union(unit.parse_layers())
             # Add problem objective function
             self.set_objective_function()
-            # Add problem constraints
-            self.set_constraints()
+      
+      def create_model_file(self):
+            # Based on the available information, create the mod file
+            temp = AmplMod()
+            temp.parse_problem_units(self.units)
+            temp.parse_problem_objective(self.objective)
+            temp.write_mod_file()
+            self.ampl_problem = AMPL()
+            self.ampl_problem.read(temp.mod_string)
+            self.ampl_problem.export_model(self.temp_folder)
 
+      def create_data_file(self):
+            # Basically parses the data internally to create the .dat file for running ampl
             
+            
+
+      def set_objective_function(self):
+            # Sets the objective function
+            if isinstance(self.problem_data.objective, str):
+                  self.objective = ObjectiveFunction(self.problem_data.objective)
+            elif isinstance(self.problem_data.objective, dict):
+                  for key, info in self.problem_data.objective.items():
+                        self.objective = ObjectiveFunction(key, info)
 
 
 
