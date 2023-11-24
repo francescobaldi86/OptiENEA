@@ -1,4 +1,5 @@
 from layer import Layer
+import pandas as pd
 
 class Unit:
     """
@@ -40,7 +41,22 @@ class Process(Unit):
     """
     def __init__(self, name, info):
         super().__init__(name, info)
-        self.power = []
+        if isinstance(info.power, float):
+            if len(self.layers) > 1:
+                raise ValueError(f'Only one value was provided for the input of process {name}, 
+                                 while based on the unit layers {len(self.layers)} were required')
+            else:
+                self.power[self.layers[0]] = [info.power]
+        elif isinstance(info.power, list):
+            if len(self.layers) != len(info.power):
+                raise ValueError(f'Only {len(info.power)} values were provided for the input of process {name}, 
+                                 while based on the unit layers {len(self.layers)} were required')
+            else:
+                for id, layer in enumerate(self.layers):
+                    self.power[layer] = [info.power[id]]
+        elif isinstance(info.power, str):
+            self.power = info.power
+
 
 class Utility(Unit):
     """
@@ -53,7 +69,22 @@ class Utility(Unit):
         self.lifetime: int | list = info['Lifetime'] | 20
         self.specific_annualized_capex: float = 0.0
         self.specific_opex: float = 0.0
-        self.power_max: list[float] = info['MaxPower'] if isinstance(info['MaxPower'], list) else [info['MaxPower']]
+        self.power_max = {}
+        if isinstance(info['MaxPower'], list):
+            if len(info['MaxPower']) == len(self.layers):
+                for id, layer in self.layers:
+                    self.power_max[layer] = info['MaxPower'][id]
+            else:
+                raise ValueError(f'The input for the max power of unit {self.name} should be a list of 
+                                 {len(self.layers)} elements based on the layers provided. A list of 
+                                 {len(info["MaxPower"])} was provided instead')
+        else:
+            if len(self.layers) == 1:
+                self.power_max[self.layers[0]] = [info['MaxPower']]
+            else:
+                raise ValueError(f'The input for the max power of unit {self.name} should be a list of 
+                                 {len(self.layers)} elements based on the layers provided. A single value was
+                                 provided instead')
     
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
@@ -68,6 +99,12 @@ class Utility(Unit):
         else:
             self.specific_annualized_capex = Utility.calculate_annualization_factor(self.lifetime, interest_rate) * self.specific_capex
 
+
+class StandardUtility(Utility):
+    # This class does not add anything to a Utility, it is only used for classification purposes
+    def __init__(self, name, info):
+        super().__init__(name, info)
+
 class StorageUnit(Utility):
     def __init__(self, name, info):
         super().__init__(name, info)
@@ -75,7 +112,7 @@ class StorageUnit(Utility):
         self.charging_efficiency: float = info['ChargingEfficiency'] | 1.0
         self.discharging_efficiency: float = info['DischargingEfficiency'] | 1.0
         self.c_rate: float = info['Rates'][0] | 1.0
-        self.e_rate = info['Rates'][1] | 1.0
+        self.e_rate: float = info['Rates'][1] | 1.0
         self.charging_energy_layer: str = info['Layers']
         self.main_layer: str | None = None
         self.charging_unit: str = info['ChargingUnitName'] | f'{name}Charger'
@@ -119,3 +156,21 @@ class Market(Utility):
     def __init__(self, name, info):
         super().__init__(name, info)
         self.activation_delay = []
+        self.energy_price = {}
+        if isinstance(info['EnergyPrice'], list):
+            if len(info['EnergyPrice']) == len(self.layers):
+                for id, layer in self.layers:
+                    self.energy_price[layer] = info['EnergyPrice'][id]
+            else:
+                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of 
+                                 {len(self.layers)} elements based on the layers provided. A list of 
+                                 {len(info["EnergyPrice"])} was provided instead')
+        elif isinstance(info['EnergyPrice'], float) or isinstance(info['EnergyPrice'], int):
+            if len(self.layers) == 1:
+                self.energy_price[self.layers[0]] = [info['MaxPower']]
+            else:
+                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of 
+                                 {len(self.layers)} elements based on the layers provided. A single value was
+                                 provided instead')
+        elif isinstance(info['EnergyPrice'], str):
+            self.energy_price = info['EnergyPrice']

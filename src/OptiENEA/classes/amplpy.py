@@ -1,8 +1,8 @@
 
 from problem import Problem
-from unit import Utility, Process, StorageUnit, Market
+from unit import Utility, Process, StorageUnit, Market, StandardUtility
 from objective_function import ObjectiveFunction
-
+import pandas as pd
 
 class AmplMod():
     def __init__(self):
@@ -20,18 +20,19 @@ class AmplMod():
     def parse_problem_units(self, units: list):
         # Parses the problem for finding the key information required to determine 
         # what is needed for the definition of the mod file
-        for unit in problem.units:
+        for unit in units:
             if isinstance(unit, Utility):
                 if unit.specific_capex > 0.0:
                     self.has_capex = True  # Checks if the problem should calculate the CAPEX
                 if isinstance(unit, StorageUnit):
                     self.has_storage = True  # Checks if there is any storage unit
-                if len(unit.power_max) > 1:
+                if isinstance(unit.power_max, pd.DataFrame):
                     self.units_with_time_dependent_maximum_power.append(unit.name)
                 if isinstance(unit, Market):
-                    for layer in unit.layers:
-                        if len(unit.prices[layer]) > 1:
+                    if isinstance(unit.energy_price, pd.DataFrame):
+                        for layer in unit.layers:
                             self.layers_with_time_dependent_price.append(layer.name)
+                            
         self.units_parsed = True
     
     def parse_problem_objective(self, objective: ObjectiveFunction):
@@ -78,8 +79,10 @@ class AmplMod():
             )
         if len(self.units_with_time_dependent_maximum_power) > 0:
             self.mod_string += "utilitiesWithTimeDependentMaxPower within utilities;\n"
+            self.mod_string += "utilitiesWithFixedMaxPower: utilities diff utilitiesWithTimeDependentMaxPower;\n"
         if len(self.layers_with_time_dependent_price) > 0:
             self.mod_string += "layersWithTimeDependentPrice within layers;\n" 
+            self.mod_string += "layersWithFixedPrice: layers diff layersWithTimeDependentPrice;\n"
 
     def write_parameters(self):
         # Adds the problem parameters to the mod file string
@@ -151,15 +154,15 @@ class AmplMod():
            """
         # Constraints to be added depending on whether energy prices depend on the time step or not
         if len(self.layers_with_time_dependent_price) > 0:
-            self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]: l not in layersWithTimeDependentPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
+            self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]: l in layersWithFixedPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
             self.mod_string += "s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]: l in layersWithTimeDependentPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l] * ENERGY_PRICE_VARIATION[l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n"
         else: 
             self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
         if len(self.units_with_time_dependent_maximum_power) > 0:
-            self.mod_string += "s.t. component_load_standard{u in standardUtilities, l in layersOfUnit[u], t in timeSteps: u not in utilitiesWithTimeDependentMaxPower}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];"
+            self.mod_string += "s.t. component_load_standard{u in standardUtilities, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];"
             self.mod_string += "s.t. component_load_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];"
-            self.mod_string += "s.t. market_limits_standard{u in markets, l in layersOfUnit[u], t in timeSteps: u not in utilitiesWithTimeDependentMaxPower}: POWER_MAX[u,l] <= power[u,l,t] <= 0;"
+            self.mod_string += "s.t. market_limits_standard{u in markets, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: POWER_MAX[u,l] <= power[u,l,t] <= 0;"
             self.mod_string += "s.t. market_limits_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;"
         else:
             self.mod_string += "s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];"
@@ -202,12 +205,115 @@ class AmplMod():
 class AmplDat():
     # Class used to handle data for ampl problem
     def __init__(self, problem: Problem):
+        # Initialize general data
+        self.ampl: Problem = problem.ampl_problem
+        self.mod: AmplMod = problem.mod
+        self.general_parameters: list = []
+        # Initialize sets
+        self.units: list = []
+        self.layers: list = []
+        self.timeSteps: list = []
+        self.processes: list = []
+        self.markets: list = []
+        self.standardUtilities: list = []
+        self.layersOfUnit: dict = {}
+        self.storageUnits: list = []
+        self.chargingUtilitiesOfStorageUnit: dict[list] = {}
+        self.dischargingUtilitiesOfStorageUnit: dict[list] = {}
+        # Initialize parameters
+        self.POWER_MAX = {}
+        self.POWER = {}
+        self.TIME_STEP_DURATION = None
+        self.OCCURRANCE = None
+        self.SPECIFIC_INVESTMENT_COST_ANNUALIZED = {}
+        self.ENERGY_PRICE = {}
+        if len(self.mod.units_with_time_dependent_maximum_power) > 0:
+            self.POWER_MAX_REL = {}
+        if len(self.mod.layers_with_time_dependent_price) > 0:
+            self.ENERGY_PRICE_VARIATION = {}
+        if self.mod.has_storage:
+            self.ENERGY_MAX, self.CRATE, self.ERATE = {}, {}, {}
+            self.STORAGE_CYCLIC_ACTIVE = None
+    
+    def parse_sets_data(self, problem: Problem):
         self.units = [unit.name for unit in problem.units]
         self.layers = [layer.name for layer in problem.layers]
-        self.time_steps = [t for t in range(0,problem.parameters.simulation_horizon)]
-        self.
+        self.timeSteps = [t for t in range(0,problem.parameters.simulation_horizon)]
+        self.processes = [unit.name for unit in problem.units if isinstance(unit, Process)]
+        self.markets = [unit.name for unit in problem.units if isinstance(unit, Market)]
+        self.standardUtilities = [unit.name for unit in problem.units if isinstance(unit, StandardUtility)]
+        self.layersOfUnit = {unit.name: unit.layers for unit in problem.units}
+        # Parsing sets that only exist if there are storage units
+        if self.mod.has_storage:
+            self.storageUnits = [unit.name for unit in problem.units if isinstance(unit, StorageUnit)]
+            self.chargingUtilitiesOfStorageUnit = {unit.name: [unit.chargingUnit] for unit in problem.units if isinstance(unit, StorageUnit)}
+            self.dischargingUtilitiesOfStorageUnit = {unit.name: [unit.dischargingUnit] for unit in problem.units if isinstance(unit, StorageUnit)}
 
-    def parse_data_from_units(units):
-        # Reads data from the units of the problem
-        
-        for unit in units:
+    def write_sets_data_to_amplpy(self):
+        # Writes the problem data to amplpy
+        SETS = ['layers', 'timeSteps', 'processes', 'markets', 'standardUtilities']
+        for s in SETS:
+            self.ampl.set[s] = self.getattr(s)
+        for unit in self.units:
+            self.ampl.set[unit] = self.layersOfUnit[unit]
+        # Writes the storage-related set
+        if self.mod.has_storage:
+            self.ampl['storageUnits'] = self.storageUnits
+            for unit in self.storageUnits:
+                self.ampl['chargingUtilitiesOfStorageUnit'][unit] = self.chargingUtilitiesOfStorageUnit[unit]
+                self.ampl['dischargingUtilitiesOfStorageUnit'][unit] = self.dischargingUtilitiesOfStorageUnit[unit]
+
+    def pars_parameters_data(self, problem: Problem):
+        # Parses data for the parameters
+        # First, general parameters
+        for param_name, param_value in problem.problem_parameters.ampl_parameters.items():
+            self.general_parameters.append(param_name)
+            self.setattr(param_name, param_value)
+        for unit in problem.units:
+            if isinstance(unit, Process):
+                for layer in unit.layers:
+                    self.POWER[unit.name][layer] = list(unit.power[layer])
+            elif isinstance(unit, Utility):
+                self.SPECIFIC_INVESTMENT_COST_ANNUALIZED[unit.name] = unit.specific_annualized_capex
+                self.POWER_MAX[unit.name] = {}
+                for layer in unit.layers:
+                    if unit in self.mod.units_with_time_dependent_maximum_power:
+                        self.POWER_MAX[unit.name][layer] = max(unit.power_max[layer])
+                        self.POWER_MAX_REL[unit.name][layer] = [x / self.POWER_MAX[unit.name][layer] for x in unit.power_max[layer]]
+                    else:
+                        self.POWER_MAX[unit.name][layer] = unit.power_max[layer]
+                    if isinstance(unit, Market):
+                        if layer in self.mod.layers_with_time_dependent_price:
+                            self.ENERGY_PRICE[layer] = sum(unit.energy_price[layer]) / len(unit.energy_price[layer])
+                            self.ENERGY_PRICE_VARIATION[layer] = [x / self.ENERGY_PRICE[layer] for x in unit.energy_price[layer]]
+                        else:
+                            self.ENERGY_PRICE[layer] = unit.energy_price[layer]
+                if isinstance(unit, StorageUnit):
+                    self.ENERGY_MAX[unit.name] = unit.capacity
+                    self.CRATE[unit.name] = unit.c_rate
+                    self.ERATE[unit.name] = unit.e_rate
+            else:
+                raise TypeError(f'Unit {unit.name} has wrong unit type: should be either Process or Utility')
+
+    def write_parameters_to_amplpy(self):
+        # Writes the problem data to amplpy
+        for param_name in self.general_parameters:
+            self.ampl.param[param_name] = self.getattr(param_name)
+        # Writing power from processes
+        for process in self.processes:
+            self.ampl.param['POWER'] = self.POWER[process]
+        # Writing specific investment cost data
+        self.ampl.param['SPECIFIC_INVESTMENT_COST_ANNUALIZED'] = self.SPECIFIC_INVESTMENT_COST_ANNUALIZED
+        # Writing power max for utilities
+        for utility in self.standardUtilities:
+            self.ampl.param['POWER_MAX'][utility] = self.POWER_MAX[utility]
+            if utility in self.mod.units_with_time_dependent_maximum_power:
+                self.ampl.param['POWER_MAX_REL'][utility] = self.POWER_MAX_REL[utility]
+        # Writing market parameters data
+        self.ampl.param['ENERGY_PRICE'] = self.ENERGY_PRICE
+        if len(self.mod.layers_with_time_dependent_price) > 0:
+            self.ampl.param['ENERGY_PRICE_VARIATION'] = self.ENERGY_PRICE_VARIATION
+        if len(self.storageUnits) > 0:
+            self.ampl.param['ENERGY_MAX'] = self.ENERGY_MAX
+            self.ampl.param['CRATE'] = self.CRATE
+            self.ampl.param['ERATE'] = self.ERATE

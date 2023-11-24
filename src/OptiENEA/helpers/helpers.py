@@ -1,4 +1,6 @@
-def read_input_from_file(data_structure, filename):
+import pandas as pd
+
+def read_config_file(data_structure, filename):
     """
       This function reads the input text file and parses it into the required
       input to the problem, in the form of a multi-level dictionary
@@ -22,13 +24,13 @@ def read_input_from_file(data_structure, filename):
                 for id_field, field in enumerate(fields):
                     fields[id_field] = field.replace("\n", "").strip()
                 if field_L1 is not None:
-                    data_structure[field_L1] = saveInfoRecursively(data_structure[field_L1], fields)
+                    data_structure[field_L1] = save_info_recursively(data_structure[field_L1], fields)
                 else:
-                    data_structure = saveInfoRecursively(data_structure, fields)
+                    data_structure = save_info_recursively(data_structure, fields)
     return data_structure
 
 
-def saveInfoRecursively(dictionary, fields):
+def save_info_recursively(dictionary, fields):
     if len(fields) < 2:
         return dictionary
     if len(fields) == 2:
@@ -37,10 +39,10 @@ def saveInfoRecursively(dictionary, fields):
         if fields[0] not in dictionary.keys():
             dictionary[fields[0]] = {}
         low_level_field = fields.pop(0)
-        dictionary[low_level_field] = saveInfoRecursively(dictionary[low_level_field], fields)
+        dictionary[low_level_field] = save_info_recursively(dictionary[low_level_field], fields)
     return dictionary
 
-def checkValueType(value):
+def check_value_type(value):
     """
     This function checks the input string, and if needed converts it to the appropriate format (float or string)
     """
@@ -54,7 +56,7 @@ def checkValueType(value):
         else:  # If it is neither a float nor a list, then it's a string
             return value
 
-def addToSet(set, field):
+def add_to_set(set, field):
     """
     This function helps reading a field that can be either a single value/string or a list
     And adds its contents to a set
@@ -66,7 +68,7 @@ def addToSet(set, field):
         set.add(field)
     return set
 
-def referenceOrUpdated(tuple_name, simulation_data, problem, type):
+def reference_or_updated(tuple_name, simulation_data, problem, type):
     """
     This function is used to select what value to use.
     If the required parameter is available in the "simulation data" columns, then the most updated
@@ -80,3 +82,31 @@ def referenceOrUpdated(tuple_name, simulation_data, problem, type):
             return problem.units[tuple_name[1]][tuple_name[0]]
         elif type == "extra":
             return problem.parameters["extra"][tuple_name][0]
+        
+def read_data_file(input: str, entity_name: str, project_folder: str) -> pd.DataFrame: 
+    """
+    Reads the file_input string. If it is "file" creates the input file name
+    based on unit_name and project folder. Else, it expects the file_input
+    to be the full location of the file name
+    :param: file_input      File input. Can be either 'file' or a full address
+    :param: unit_name       The name of the entity we are reading data of. 
+    :param: project_folder  The location of the project where we should read the file
+    """
+    if isinstance(input, list):
+        return input
+    elif isinstance(input, str):
+        if input == 'file':
+            return pd.read_csv(
+                f'{project_folder}\\data\\{entity_name}.csv', 
+                index_col=0, 
+                header=0)
+        else:
+            try:
+                return pd.read_csv(input, index_col=0, header=0)
+            except:
+                FileNotFoundError(f'File at location {input} was not found')
+    else:
+        return TypeError(f'The input provided for entity {entity_name} is {input} and
+                         it appears not valid. Please check it! It should be either
+                         a list of values, or a string')
+            

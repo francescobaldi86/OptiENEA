@@ -10,13 +10,13 @@ This file describes the classes of the OptiENEA tool
 import os
 from datetime import datetime
 from amplpy import AMPL
-from unit import Unit, StorageUnit
+from unit import *
 from problem_parameters import ProblemParameters
 from problem_data import ProblemData
-from objective import Objective
-from constraint import Constraint
+from objective_function import ObjectiveFunction
 from layer import Layer
 from amplpy import AmplMod
+from helpers.helpers import read_data_file
 
 class Problem:
       # Initialization function
@@ -31,8 +31,8 @@ class Problem:
             self.units: list[Unit] | None = None
             self.parameters: ProblemParameters | None = None
             self.problem_data: ProblemData | None = None
-            self.objective: Objective | None
-            self.constraints: [Constraint] | None = None
+            self.objective: ObjectiveFunction | None
+            # self.constraints: [Constraint] | None = None
             self.layers: set[Layer] | None = None
             # self.parametric = dict()
 
@@ -81,11 +81,14 @@ class Problem:
             for unit_name, unit_info in self.problem_data.unit_data.items():
                   new_unit = Unit.load_unit(unit_name, unit_info)
                   new_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)
-                  self.units.append()
-            # Checking for storage units and add related auxiliary units
-            for unit in self.units:
-                  if isinstance(unit, StorageUnit):
+                  self.units.append(new_unit)
+                  # If it is a storage unit, let's also add the related charging and discharging units
+                  if isinstance(new_unit, StorageUnit):
                         self.units = self.units + unit.create_auxiliary_units()
+                  elif isinstance(new_unit, Process):
+                        self.power = read_data_file(new_unit.power, new_unit.name, self.problem_folder)
+                  elif isinstance(new_unit, Market):
+                        self.energy_price = read_data_file(new_unit.energy_price, new_unit.name, self.problem_folder)
             # Add problem layers
             for unit in self.units:
                   self.layers.union(unit.parse_layers())
@@ -94,17 +97,17 @@ class Problem:
       
       def create_model_file(self):
             # Based on the available information, create the mod file
-            temp = AmplMod()
-            temp.parse_problem_units(self.units)
-            temp.parse_problem_objective(self.objective)
-            temp.write_mod_file()
+            self.mod = AmplMod()
+            self.mod.parse_problem_units(self.units)
+            self.mod.parse_problem_objective(self.objective)
+            self.mod.write_mod_file()
             self.ampl_problem = AMPL()
-            self.ampl_problem.read(temp.mod_string)
+            self.ampl_problem.read(self.mod.mod_string)
             self.ampl_problem.export_model(self.temp_folder)
 
       def create_data_file(self):
             # Basically parses the data internally to create the .dat file for running ampl
-            
+            aaa = 0
             
 
       def set_objective_function(self):
@@ -117,18 +120,7 @@ class Problem:
 
 
 
-      def parse_problem_sets(self):
-            self.sets = {"0": dict(), "1": dict(), "2": dict()}
-            self.sets["0"]["timeSteps"] = list(
-                  [str(i) for i in range(1, int(self.general_parameters["NT"]) + 1)])
-            self.sets = parse_sets(self.sets, self.units)
-
-      def parse_problem_parameters(self):
-            for level in ["0", "1", "2", "3", "extra"]:
-                  if level not in self.parameters.keys():
-                        self.parameters[level] = dict()
-            self.parameters = parse_parameters(self)
-            
+    
             
 
 """
@@ -162,4 +154,18 @@ def set_problem_name(self):
             if self.temp_problem_folder is not None:
                   self.temp_folder = self.temp_problem_folder + sim_folder_addend
                   os.mkdir(self.temp_folder)
+
+
+        def parse_problem_sets(self):
+            self.sets = {"0": dict(), "1": dict(), "2": dict()}
+            self.sets["0"]["timeSteps"] = list(
+                  [str(i) for i in range(1, int(self.general_parameters["NT"]) + 1)])
+            self.sets = parse_sets(self.sets, self.units)
+
+      def parse_problem_parameters(self):
+            for level in ["0", "1", "2", "3", "extra"]:
+                  if level not in self.parameters.keys():
+                        self.parameters[level] = dict()
+            self.parameters = parse_parameters(self)
+            
 """
