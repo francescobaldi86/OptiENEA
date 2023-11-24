@@ -10,17 +10,18 @@ This file describes the classes of the OptiENEA tool
 import os
 from datetime import datetime
 from amplpy import AMPL
-from unit import *
-from problem_parameters import ProblemParameters
-from problem_data import ProblemData
-from objective_function import ObjectiveFunction
-from layer import Layer
-from amplpy import AmplMod
-from helpers.helpers import read_data_file
+from OptiENEA.classes.unit import *
+from OptiENEA.classes.problem_parameters import ProblemParameters
+from OptiENEA.classes.problem_data import ProblemData
+from OptiENEA.classes.objective_function import ObjectiveFunction
+from OptiENEA.classes.layer import Layer
+from OptiENEA.classes.amplpy import AmplMod, AmplDat
+from OptiENEA.helpers.helpers import read_data_file
 
 class Problem:
       # Initialization function
-      def __init__(self, name: str, problem_folder = None, temp_folder = None):
+      def __init__(self, name: str, problem_folder = None, temp_folder = None, 
+                   check_input_data = True, create_problem_folders = True):
             """
             :param: problem_folder        the folder where the main content of the problem is (data, results, etc)
             :param: temp_folder           the temporary folder where temporary data is saved. Useful to specify if problem_folder is on cloud and many simulations are expected
@@ -35,6 +36,10 @@ class Problem:
             # self.constraints: [Constraint] | None = None
             self.layers: set[Layer] | None = None
             # self.parametric = dict()
+            if check_input_data:
+                  self.check_input_data()
+            if create_problem_folders:
+                  self.create_folders()
 
       def full_run(self):
             """

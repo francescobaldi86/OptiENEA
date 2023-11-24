@@ -1,8 +1,8 @@
-
-from problem import Problem
-from unit import Utility, Process, StorageUnit, Market, StandardUtility
-from objective_function import ObjectiveFunction
+from OptiENEA.classes.problem_parameters import ProblemParameters
+from OptiENEA.classes.unit import Utility, Process, StorageUnit, Market, StandardUtility
+from OptiENEA.classes.objective_function import ObjectiveFunction
 import pandas as pd
+import amplpy
 
 class AmplMod():
     def __init__(self):
@@ -204,10 +204,10 @@ class AmplMod():
         
 class AmplDat():
     # Class used to handle data for ampl problem
-    def __init__(self, problem: Problem):
+    def __init__(self, ampl_problem: amplpy.AMPL, mod: AmplMod):
         # Initialize general data
-        self.ampl: Problem = problem.ampl_problem
-        self.mod: AmplMod = problem.mod
+        self.ampl: amplpy.AMPL = ampl_problem
+        self.mod: AmplMod = mod
         self.general_parameters: list = []
         # Initialize sets
         self.units: list = []
@@ -235,19 +235,19 @@ class AmplDat():
             self.ENERGY_MAX, self.CRATE, self.ERATE = {}, {}, {}
             self.STORAGE_CYCLIC_ACTIVE = None
     
-    def parse_sets_data(self, problem: Problem):
-        self.units = [unit.name for unit in problem.units]
-        self.layers = [layer.name for layer in problem.layers]
-        self.timeSteps = [t for t in range(0,problem.parameters.simulation_horizon)]
-        self.processes = [unit.name for unit in problem.units if isinstance(unit, Process)]
-        self.markets = [unit.name for unit in problem.units if isinstance(unit, Market)]
-        self.standardUtilities = [unit.name for unit in problem.units if isinstance(unit, StandardUtility)]
-        self.layersOfUnit = {unit.name: unit.layers for unit in problem.units}
+    def parse_sets_data(self, units: list, layers: list, parameters: ProblemParameters):
+        self.units = [unit.name for unit in units]
+        self.layers = [layer.name for layer in layers]
+        self.timeSteps = [t for t in range(0,parameters.simulation_horizon)]
+        self.processes = [unit.name for unit in units if isinstance(unit, Process)]
+        self.markets = [unit.name for unit in units if isinstance(unit, Market)]
+        self.standardUtilities = [unit.name for unit in units if isinstance(unit, StandardUtility)]
+        self.layersOfUnit = {unit.name: unit.layers for unit in units}
         # Parsing sets that only exist if there are storage units
         if self.mod.has_storage:
-            self.storageUnits = [unit.name for unit in problem.units if isinstance(unit, StorageUnit)]
-            self.chargingUtilitiesOfStorageUnit = {unit.name: [unit.chargingUnit] for unit in problem.units if isinstance(unit, StorageUnit)}
-            self.dischargingUtilitiesOfStorageUnit = {unit.name: [unit.dischargingUnit] for unit in problem.units if isinstance(unit, StorageUnit)}
+            self.storageUnits = [unit.name for unit in units if isinstance(unit, StorageUnit)]
+            self.chargingUtilitiesOfStorageUnit = {unit.name: [unit.chargingUnit] for unit in units if isinstance(unit, StorageUnit)}
+            self.dischargingUtilitiesOfStorageUnit = {unit.name: [unit.dischargingUnit] for unit in units if isinstance(unit, StorageUnit)}
 
     def write_sets_data_to_amplpy(self):
         # Writes the problem data to amplpy
@@ -263,13 +263,13 @@ class AmplDat():
                 self.ampl['chargingUtilitiesOfStorageUnit'][unit] = self.chargingUtilitiesOfStorageUnit[unit]
                 self.ampl['dischargingUtilitiesOfStorageUnit'][unit] = self.dischargingUtilitiesOfStorageUnit[unit]
 
-    def pars_parameters_data(self, problem: Problem):
+    def pars_parameters_data(self, units: list, parameters: ProblemParameters):
         # Parses data for the parameters
         # First, general parameters
-        for param_name, param_value in problem.problem_parameters.ampl_parameters.items():
+        for param_name, param_value in parameters.ampl_parameters.items():
             self.general_parameters.append(param_name)
             self.setattr(param_name, param_value)
-        for unit in problem.units:
+        for unit in units:
             if isinstance(unit, Process):
                 for layer in unit.layers:
                     self.POWER[unit.name][layer] = list(unit.power[layer])

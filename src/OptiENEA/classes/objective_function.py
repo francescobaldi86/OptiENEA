@@ -1,5 +1,3 @@
-
-
 class ObjectiveFunction():
     def __init__(self, name: str, info = {}):
         self.name = name

@@ -106,7 +106,7 @@ def read_data_file(input: str, entity_name: str, project_folder: str) -> pd.Data
             except:
                 FileNotFoundError(f'File at location {input} was not found')
     else:
-        return TypeError(f'The input provided for entity {entity_name} is {input} and
-                         it appears not valid. Please check it! It should be either
+        return TypeError(f'The input provided for entity {entity_name} is {input} and \
+                         it appears not valid. Please check it! It should be either \
                          a list of values, or a string')
             

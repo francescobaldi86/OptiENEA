@@ -1,4 +1,4 @@
-from layer import Layer
+from OptiENEA.classes.layer import Layer
 import pandas as pd
 
 class Unit:
@@ -43,13 +43,13 @@ class Process(Unit):
         super().__init__(name, info)
         if isinstance(info.power, float):
             if len(self.layers) > 1:
-                raise ValueError(f'Only one value was provided for the input of process {name}, 
+                raise ValueError(f'Only one value was provided for the input of process {name}, \
                                  while based on the unit layers {len(self.layers)} were required')
             else:
                 self.power[self.layers[0]] = [info.power]
         elif isinstance(info.power, list):
             if len(self.layers) != len(info.power):
-                raise ValueError(f'Only {len(info.power)} values were provided for the input of process {name}, 
+                raise ValueError(f'Only {len(info.power)} values were provided for the input of process {name}, \
                                  while based on the unit layers {len(self.layers)} were required')
             else:
                 for id, layer in enumerate(self.layers):
@@ -75,15 +75,15 @@ class Utility(Unit):
                 for id, layer in self.layers:
                     self.power_max[layer] = info['MaxPower'][id]
             else:
-                raise ValueError(f'The input for the max power of unit {self.name} should be a list of 
-                                 {len(self.layers)} elements based on the layers provided. A list of 
+                raise ValueError(f'The input for the max power of unit {self.name} should be a list of \
+                                 {len(self.layers)} elements based on the layers provided. A list of \
                                  {len(info["MaxPower"])} was provided instead')
         else:
             if len(self.layers) == 1:
                 self.power_max[self.layers[0]] = [info['MaxPower']]
             else:
-                raise ValueError(f'The input for the max power of unit {self.name} should be a list of 
-                                 {len(self.layers)} elements based on the layers provided. A single value was
+                raise ValueError(f'The input for the max power of unit {self.name} should be a list of \
+                                 {len(self.layers)} elements based on the layers provided. A single value was \
                                  provided instead')
     
     @staticmethod
@@ -162,15 +162,15 @@ class Market(Utility):
                 for id, layer in self.layers:
                     self.energy_price[layer] = info['EnergyPrice'][id]
             else:
-                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of 
-                                 {len(self.layers)} elements based on the layers provided. A list of 
+                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of \
+                                 {len(self.layers)} elements based on the layers provided. A list of \
                                  {len(info["EnergyPrice"])} was provided instead')
         elif isinstance(info['EnergyPrice'], float) or isinstance(info['EnergyPrice'], int):
             if len(self.layers) == 1:
                 self.energy_price[self.layers[0]] = [info['MaxPower']]
             else:
-                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of 
-                                 {len(self.layers)} elements based on the layers provided. A single value was
+                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of \
+                                 {len(self.layers)} elements based on the layers provided. A single value was \
                                  provided instead')
         elif isinstance(info['EnergyPrice'], str):
             self.energy_price = info['EnergyPrice']

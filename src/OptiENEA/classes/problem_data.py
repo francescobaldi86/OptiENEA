@@ -1,4 +1,4 @@
-from helpers import read_input_from_file
+from OptiENEA.helpers.helpers import read_config_file
 
 class ProblemData:
     """
@@ -9,6 +9,6 @@ class ProblemData:
         self.general_data: dict | None = None
     
     def read_unit_data(self, problem_folder):
-        self.unit_data = read_input_from_file(f'{problem_folder}\\units.txt')
-        self.general_data = read_input_from_file(f'{problem_folder}\\general.txt')
+        self.unit_data = read_config_file(f'{problem_folder}\\units.txt')
+        self.general_data = read_config_file(f'{problem_folder}\\general.txt')
     

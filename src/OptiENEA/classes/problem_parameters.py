@@ -1,5 +1,3 @@
-
-
 class ProblemParameters:
     # Class containing the problem parameters
 

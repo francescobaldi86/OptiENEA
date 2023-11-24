@@ -1,8 +1,8 @@
 [build-system]
 requires = [
     "setuptools>=61.0",
-    "pandas"
-    "matplotlib"
+    "pandas",
+    "matplotlib",
     "numpy"
     ]
 build-backend = "setuptools.build_meta"
@@ -11,11 +11,11 @@ build-backend = "setuptools.build_meta"
 name = "OptiENEA"
 version = "1.0.0"
 authors = [
-  { name="Francesco Baldi", email="francesco.baldi86@gmail.com" },
+  { name="Francesco Baldi", email="francesco.baldi86@gmail.com" }
 ]
 description = "A package to setup and run MILP system optimization problems using AMPL"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -25,3 +25,6 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/francescobaldi86/OptiENEA"
 "Bug Tracker" = "https://github.com/francescobaldi86/OptiENEA/issues"
+
+[project.optional-dependencies]
+dev = ["flake8", "pytest"]

@@ -1,4 +1,4 @@
-from problem import Problem
+from OptiENEA.classes.problem import Problem
 
 class Project:
     def __init__(self, name: str, folder):
