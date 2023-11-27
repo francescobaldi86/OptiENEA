@@ -1,10 +1,10 @@
 import pandas as pd
 
-def read_config_file(data_structure, filename):
+def read_config_file(filename: str, data_structure = {}) -> dict:
     """
       This function reads the input text file and parses it into the required
       input to the problem, in the form of a multi-level dictionary
-      """
+    """
     with open(filename) as file:
         field_L1 = None
         for line in file.readlines():

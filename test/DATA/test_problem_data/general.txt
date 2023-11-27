@@ -1,0 +1,1 @@
+% mainproblem_type; "LP"simulation_name; "Test problem"general_parameters; {"NT": 8760, "InterestRate": 0.06}interpreter; "ampl"solver; "cplexamp"objective; "OPEX"% parametersextra; Alpha_wind; 0.60extra; Minimum_energy_price; 400; OCCURRANCE; 10; TIME_STEP_DURATION; 10; STORAGE_CYCLIC_ACTIVE; 1
