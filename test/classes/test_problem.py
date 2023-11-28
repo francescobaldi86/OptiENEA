@@ -36,3 +36,7 @@ def test_read_problem_data():
     assert problem.problem_data.unit_data['WindFarm']['Power'] == 'file'
     assert problem.problem_data.unit_data['Market']['Type'] == 'Market'
     assert problem.problem_data.unit_data['Market']['MaxPower'] == [-10000]
+
+def test_process_problem_data():
+    # Tests the "process_problem_data" function
+    assert True

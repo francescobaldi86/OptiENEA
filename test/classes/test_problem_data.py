@@ -16,9 +16,8 @@ def test_read_data():
     problem_data.read_unit_data(test_problem_folder)
     assert isinstance(problem_data.general_data, dict)
     assert isinstance(problem_data.unit_data, dict)
-    assert problem_data.general_data['main']['problem_type'] == 'LP'
-    assert problem_data.general_data['main']['objective'] == 'OPEX'
-    assert isinstance(problem_data.general_data['main']['general_parameters'], dict)
+    assert problem_data.general_data['parameters']['Interest rate'] == 0.07
+    assert problem_data.general_data['settings']['Objective'] == 'OPEX'
     assert problem_data.unit_data['WindFarm']['Type'] == 'Process'
     assert problem_data.unit_data['WindFarm']['Power'] == 'file'
     assert problem_data.unit_data['Market']['Type'] == 'Market'

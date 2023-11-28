@@ -81,7 +81,8 @@ class Problem:
             Units and general are read separately
             """
             # Processing general data
-            self.problem_parameters = ProblemParameters(self.problem_data.general_data)
+            self.problem_parameters = ProblemParameters()
+            self.problem_parameters.read_problem_paramters(self.problem_data.general_data)
             # Processing units data
             for unit_name, unit_info in self.problem_data.unit_data.items():
                   new_unit = Unit.load_unit(unit_name, unit_info)
