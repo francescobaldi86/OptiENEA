@@ -36,6 +36,8 @@ class Problem:
             # self.constraints: [Constraint] | None = None
             self.layers: set[Layer] | None = None
             # self.parametric = dict()
+            self.has_typical_days: bool = False
+
             if check_input_data:
                   self.check_input_data()
             if create_problem_folders:
@@ -83,6 +85,7 @@ class Problem:
             # Processing general data
             self.problem_parameters = ProblemParameters()
             self.problem_parameters.read_problem_paramters(self.problem_data.general_data)
+            self.has_typical_days = True if len(self.problem_parameters.ampl_parameters["OCCURRENCE"] == 1) else False
             # Processing units data
             for unit_name, unit_info in self.problem_data.unit_data.items():
                   new_unit = Unit.load_unit(unit_name, unit_info)
@@ -92,7 +95,7 @@ class Problem:
                   if isinstance(new_unit, StorageUnit):
                         self.units = self.units + unit.create_auxiliary_units()
                   elif isinstance(new_unit, Process):
-                        self.power = read_data_file(new_unit.power, new_unit.name, self.problem_folder)
+                        new_unit.power = new_unit.check_power_input(self.problem_folder, self.has_typical_days)
                   elif isinstance(new_unit, Market):
                         self.energy_price = read_data_file(new_unit.energy_price, new_unit.name, self.problem_folder)
             # Add problem layers

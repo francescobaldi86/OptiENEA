@@ -1,5 +1,7 @@
 from OptiENEA.classes.layer import Layer
+from OptiENEA.helpers.helpers import read_data_file
 import pandas as pd
+
 
 class Unit:
     """
@@ -7,9 +9,10 @@ class Unit:
     """
     def __init__(self, name, info):
         self.name: str = name
-        self.type = info['type']
+        self.type = info['Type']
         self.layers: list = info['Layers'] if isinstance(info['Layers'], list) else [info['Layers']]
-        self.mainLayer: str = info['MainLayer'] | self.layers[0]
+        self.mainLayer: str = info['Main layer'] if 'Main layer' in info.keys() else None
+        self.check_main_layer()
     
     @staticmethod
     def load_unit(name: str, info: dict):
@@ -25,6 +28,15 @@ class Unit:
                     case 'Market':
                         return Market(name, info)
 
+    def check_main_layer(self):
+        # Checks that the main layer is one of the layers
+        if self.mainLayer:  # If an input value for the "main layer" field was provided, we make sure that it is also one of the layers
+            if self.mainLayer not in self.layers:
+                raise NameError(f"The main layer provided for unit {self.name} is {self.mainLayer} and it is not one of the unit's layers {self.layers}. Please fix this!")
+        else:
+            if len(self.layers) > 1:
+                Warning(f"The main layer for unit {self.name} was not provided. The first layer in the list {self.layers[0]} was used as main layer")
+            self.mainLayer = self.layers[0]
 
     def parse_layers(self):
         # This method parses the unit's layers and assigns them to a set of "Layer" objects
@@ -41,21 +53,43 @@ class Process(Unit):
     """
     def __init__(self, name, info):
         super().__init__(name, info)
-        if isinstance(info.power, float):
+        self.power: dict | str = {}
+        if isinstance(info['Power'], float|int):  # One single value is acceptable only if the process only has one layer
             if len(self.layers) > 1:
                 raise ValueError(f'Only one value was provided for the input of process {name}, \
                                  while based on the unit layers {len(self.layers)} were required')
             else:
-                self.power[self.layers[0]] = [info.power]
-        elif isinstance(info.power, list):
-            if len(self.layers) != len(info.power):
-                raise ValueError(f'Only {len(info.power)} values were provided for the input of process {name}, \
+                self.power[self.layers[0]] = [info['Power']]
+        elif isinstance(info['Power'], list):  # If the Power field is a list of values, we interpret them as the fixed power values for each layer
+            if len(self.layers) != len(info['Power']):
+                raise ValueError(f'Only {len(info['Power'])} values were provided for the input of process {name}, \
                                  while based on the unit layers {len(self.layers)} were required')
             else:
                 for id, layer in enumerate(self.layers):
-                    self.power[layer] = [info.power[id]]
-        elif isinstance(info.power, str):
-            self.power = info.power
+                    self.power[layer] = [info['Power'][id]]
+        elif isinstance(info['Power'], str):  # We can also provide a string, it will be interpreted later. If it is 'file' we read the file based on a standard naming
+            self.power = info['Power']
+
+    def check_power_input(self, problem_folder = None, has_typical_days = False):
+        # Checks the input field for the process power. If it's a dictionary it leaves it as it is, if it's a string it tries to read the file
+        if isinstance(self.power, str):
+            if has_typical_days:  # If the problem has typical days, we read one file for each layer. Files should be named "unit_layer.csv"
+                data = {}
+                for layer in self.layers:
+                    data[layer] = read_data_file(input = self.power, 
+                                                entity_name = f'power_{self.name}_{layer}', 
+                                                problem_folder = problem_folder)
+            else:  # If the problem does not have typical days, we expect a pd.DataFrame with one column per layer, one row per time step
+                data = read_data_file(input = self.power, 
+                                    entity_name = f'power_{self.name}', 
+                                    problem_folder = problem_folder)
+            self.power = data
+        elif isinstance(self.power, dict):  # If the value is a dictionary, we keep it as it is
+            pass
+        else:
+            return TypeError(f'The input provided for entity {self.name} is {self.power} and \
+                         it appears not valid. Please check it! It should be either \
+                         a list of values, or a string')
 
 
 class Utility(Unit):

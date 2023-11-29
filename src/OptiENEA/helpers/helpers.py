@@ -83,30 +83,29 @@ def reference_or_updated(tuple_name, simulation_data, problem, type):
         elif type == "extra":
             return problem.parameters["extra"][tuple_name][0]
         
-def read_data_file(input: str, entity_name: str, project_folder: str) -> pd.DataFrame: 
+def read_data_file(input: str, entity_name: str, problem_folder = None) -> pd.DataFrame: 
     """
     Reads the file_input string. If it is "file" creates the input file name
     based on unit_name and project folder. Else, it expects the file_input
     to be the full location of the file name
     :param: file_input      File input. Can be either 'file' or a full address
     :param: unit_name       The name of the entity we are reading data of. 
-    :param: project_folder  The location of the project where we should read the file
+    :param: problem_folder  The location of the project where we should read the file
     """
-    if isinstance(input, list):
-        return input
-    elif isinstance(input, str):
-        if input == 'file':
+    if input == 'file':
+        if problem_folder:
             return pd.read_csv(
-                f'{project_folder}\\data\\{entity_name}.csv', 
+                f'{problem_folder}\\data\\{entity_name}.csv', 
                 index_col=0, 
                 header=0)
         else:
-            try:
-                return pd.read_csv(input, index_col=0, header=0)
-            except:
-                FileNotFoundError(f'File at location {input} was not found')
+            raise ValueError(f'If the input value for the data is "file", then a real problem folder needs to be provided')
     else:
-        return TypeError(f'The input provided for entity {entity_name} is {input} and \
-                         it appears not valid. Please check it! It should be either \
-                         a list of values, or a string')
+        if input[-4:] != '.csv':
+            raise TypeError(f"The file provided should have a .csv format. {input} was provided instead")
+        try:
+            return pd.read_csv(input, index_col=0, header=0)
+        except:
+            FileNotFoundError(f'File at location {input} was not found')
+    
             
