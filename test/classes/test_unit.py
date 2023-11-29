@@ -3,10 +3,12 @@ import os
 
 TEST_INFO_UNIT = {'Type': 'no type', 'Layers': ['test_layer_1', 'test_layer_2'], 'Main layer': 'test_layer_1'}
 TEST_INFO_PROCESS = {'Type': 'Process', 'Layers': ['Electricity', 'Heat'], 'Main layer': 'Electricity', 'Power': 10}
-TEST_INFO_UTILITY = {}
+TEST_INFO_UTILITY = {'Type': 'Utility', 'Investment cost': 140, 'Lifetime': 25, 'Layers': ['Electricity', 'Heat'], 
+                     'Main layer': 'Electricity', 'Max power': [1400, 900]}
 TEST_INFO_STANDARD_UTILTY = {}
 TEST_INFO_STORAGE_UNIT = {}
 TEST_INFO_MARKET = {}
+INTEREST_RATE = 0.07
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
 
@@ -59,10 +61,34 @@ def test_init_process_power_file_TD():
     assert process.power['Heat'].loc[18, 'TD2'] == 7.7
 
 
+def test_init_utility_default():
+    # Tests the creation of a utility with no additional information
+    TEST_INFO_UTILITY = {'Type': 'Utility', 'Layers': ['Electricity', 'Heat'], 
+                     'Main layer': 'Electricity', 'Max power': [1400, 900]}
+    utility = Utility('test_utility', TEST_INFO_UTILITY)
+    assert utility.lifetime == 20
+    assert utility.specific_capex == 0.0
+    assert utility.power_max == {'Electricity': 1400, 'Heat': 900}
 
-def test_init_utility():
-    # Tests the creation of a utility
-    assert True
+def test_init_utility_base():
+    # Tests the creation of a utility with no additional information
+    utility = Utility('test_utility', TEST_INFO_UTILITY)
+    assert utility.lifetime == 25
+    assert utility.specific_capex == 140
+    assert utility.power_max == {'Electricity': 1400, 'Heat': 900}
+
+def test_calculate_annualized_capex():
+    # Tests the function that calculates the annualized capex
+    utility = Utility('test_utility', TEST_INFO_UTILITY)
+    assert round(Utility.calculate_annualization_factor(utility.lifetime, INTEREST_RATE),1) == 11.7
+    # Tests the calculation of the annualized capex
+    utility.calculate_annualized_capex(INTEREST_RATE)
+    assert round(utility.specific_annualized_capex, 1) == 12.0
+
+
+    
+
+
 
 def test_init_standard_utility():
     # Tests the creation of a standard utility

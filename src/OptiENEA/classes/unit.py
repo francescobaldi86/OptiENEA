@@ -99,23 +99,24 @@ class Utility(Unit):
     """
     def __init__(self, name, info):
         super().__init__(name, info)
-        self.specific_capex: float | list = info['InvestmentCost'] | 0.0
-        self.lifetime: int | list = info['Lifetime'] | 20
-        self.specific_annualized_capex: float = 0.0
-        self.specific_opex: float = 0.0
-        self.power_max = {}
-        if isinstance(info['MaxPower'], list):
-            if len(info['MaxPower']) == len(self.layers):
-                for id, layer in self.layers:
-                    self.power_max[layer] = info['MaxPower'][id]
-            else:
+        self.specific_capex: float | int | list = info['Investment cost'] if 'Investment cost' in info.keys() else 0
+        self.lifetime: int | list = info['Lifetime'] if 'Lifetime' in info.keys() else 20
+        self.specific_annualized_capex: float | int = 0.0
+        self.specific_opex: float | int = 0.0
+        self.power_max: dict = {}
+        # Reading power max
+        if isinstance(info['Max power'], list): # If Max power is a list, we assume it has one value per layer, ordered as the layers
+            if len(info['Max power']) == len(self.layers):
+                for id, layer in enumerate(self.layers):
+                    self.power_max[layer] = info['Max power'][id]
+            else:  # Issue an error if the number of values in the list is different from the number of layers
                 raise ValueError(f'The input for the max power of unit {self.name} should be a list of \
                                  {len(self.layers)} elements based on the layers provided. A list of \
-                                 {len(info["MaxPower"])} was provided instead')
-        else:
+                                 {len(info["Max power"])} was provided instead')
+        else:  # If only one value is provided, we assume it's because there is only one layer
             if len(self.layers) == 1:
-                self.power_max[self.layers[0]] = [info['MaxPower']]
-            else:
+                self.power_max[self.layers[0]] = [info['Max power']]
+            else:  # If one value is provided but there are two or more errors, we raise a ValueError
                 raise ValueError(f'The input for the max power of unit {self.name} should be a list of \
                                  {len(self.layers)} elements based on the layers provided. A single value was \
                                  provided instead')
@@ -129,9 +130,9 @@ class Utility(Unit):
         # Calculates the annualized capital cost (specific) for each unit
         if isinstance(self.specific_capex, list):
             # If the data about the specific capex is a list, the calculation is done differently
-            self.specific_annualized_capex = sum([Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) * self.specific_capex[i] for i in range(len(self.lifetime))])
+            self.specific_annualized_capex = sum([self.specific_capex[i] / Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) for i in range(len(self.lifetime))])
         else:
-            self.specific_annualized_capex = Utility.calculate_annualization_factor(self.lifetime, interest_rate) * self.specific_capex
+            self.specific_annualized_capex = self.specific_capex / Utility.calculate_annualization_factor(self.lifetime, interest_rate)
 
 
 class StandardUtility(Utility):
