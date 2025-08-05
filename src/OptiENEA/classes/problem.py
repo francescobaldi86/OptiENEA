@@ -12,7 +12,6 @@ from datetime import datetime
 from amplpy import AMPL
 from OptiENEA.classes.unit import *
 from OptiENEA.classes.problem_parameters import ProblemParameters
-from OptiENEA.classes.problem_data import ProblemData
 from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplMod, AmplDat
@@ -31,7 +30,8 @@ class Problem:
             self.temp_folder = temp_folder
             self.units: list[Unit] | None = None
             self.parameters: ProblemParameters | None = None
-            self.problem_data: ProblemData | None = None
+            self.raw_unit_data: dict | None = None
+            self.raw_general_data : dict | None = None
             self.objective: ObjectiveFunction | None
             # self.constraints: [Constraint] | None = None
             self.layers: set[Layer] | None = None
@@ -70,11 +70,13 @@ class Problem:
             """
             Reads the problem data. 
             They MUST be stored in the problem folder with the names:
-                  - 'units.txt' for data related to problem units
-                  - 'general.txt' for general data about the problem
+                  - 'units.yml' for data related to problem units
+                  - 'general.yml' for general data about the problem
             """
-            self.problem_data = ProblemData()
-            self.problem_data.read_problem_data(self.problem_folder)
+            with open(f'{self.problem_folder}\\units.yml', 'r') as stream:
+                  self.raw_unit_data = yaml.safe_load(stream)
+            with open(f'{self.problem_folder}\\general.yml', 'r') as stream:
+                  self.raw_general_data = yaml.safe_load(stream)
       
 
       def process_problem_data(self):
@@ -84,23 +86,27 @@ class Problem:
             """
             # Processing general data
             self.problem_parameters = ProblemParameters()
-            self.problem_parameters.read_problem_paramters(self.problem_data.general_data)
+            self.problem_parameters.read_problem_paramters(self.raw_general_data)
+            # Checking if the problem has typical days
             self.has_typical_days = True if len(self.problem_parameters.ampl_parameters["OCCURRENCE"] == 1) else False
             # Processing units data
-            for unit_name, unit_info in self.problem_data.unit_data.items():
-                  new_unit = Unit.load_unit(unit_name, unit_info)
-                  new_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)
-                  self.units.append(new_unit)
-                  # If it is a storage unit, let's also add the related charging and discharging units
-                  if isinstance(new_unit, StorageUnit):
-                        self.units = self.units + unit.create_auxiliary_units()
-                  elif isinstance(new_unit, Process):
+            for unit_name, unit_info in self.raw_unit_data():
+                  new_unit = Unit.load_unit(unit_name, unit_info)  # Create the new unit
+                  # Check some specific cases
+                  if isinstance(new_unit, StandardUtility):
+                        new_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)  # Calculate its investment cost
+                  elif isinstance(new_unit, Process): # If it is a process, we also check the power input (we might need to read another file)
                         new_unit.power = new_unit.check_power_input(self.problem_folder, self.has_typical_days)
-                  elif isinstance(new_unit, Market):
+                  elif isinstance(new_unit, Market): # If it is a market unit, we might need to read a file with time-dependent energy prices
                         self.energy_price = read_data_file(new_unit.energy_price, new_unit.name, self.problem_folder)
-            # Add problem layers
-            for unit in self.units:
-                  self.layers.union(unit.parse_layers())
+                  elif isinstance(new_unit, StorageUnit): # If it is a storage unit, let's also add the related charging and discharging units
+                        aux_units = new_unit.create_auxiliary_units()
+                        for aux_unit in aux_units:
+                              aux_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)  # Calculate its investment cost
+                              self.units.append(aux_unit)
+                              self.layers.union(aux_unit.parse_layers())
+                  self.units.append(new_unit)
+                  self.layers.union(new_unit.parse_layers())        
             # Add problem objective function
             self.set_objective_function()
       

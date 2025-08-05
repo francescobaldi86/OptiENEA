@@ -29,6 +29,10 @@ def read_config_file(filename: str, data_structure = {}) -> dict:
                     data_structure = save_info_recursively(data_structure, fields)
     return data_structure
 
+def safe_to_list(input: int | str | float | list):
+    # Reads the input. If it is a list it returns it as is, otherwise it makes it a list
+    return input if isinstance(input, list) else [input]
+
 
 def save_info_recursively(dictionary, fields):
     if len(fields) < 2:
@@ -107,5 +111,8 @@ def read_data_file(input: str, entity_name: str, problem_folder = None) -> pd.Da
             return pd.read_csv(input, index_col=0, header=0)
         except:
             FileNotFoundError(f'File at location {input} was not found')
-    
-            
+
+def attribute_name_converter(input: str) -> str:
+    # This function is used to convert "extensive" attribute names used in the YAML configuration file to 
+    # the pure snake-case format used for unit attributes
+    return input.replace(" ", "_").replace("-", "_").lower()

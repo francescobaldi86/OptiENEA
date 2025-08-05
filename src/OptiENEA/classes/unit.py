@@ -1,6 +1,11 @@
 from OptiENEA.classes.layer import Layer
-from OptiENEA.helpers.helpers import read_data_file
+from OptiENEA.helpers.helpers import read_data_file, attribute_name_converter
 import pandas as pd
+import os
+import yaml
+
+with open(f'{os.path.dirname(os.path.realpath(__file__))}\\..\\lib\\units_default_values.yml') as stream:
+    UNITS_DEFAULT_DATA = yaml.safe_load(stream)
 
 
 class Unit:
@@ -8,41 +13,82 @@ class Unit:
     Units are the basic obejct in OptiENEA. Every unit has a number of attributes
     """
     def __init__(self, name, info):
-        self.name: str = name
-        self.type = info['Type']
-        self.layers: list = info['Layers'] if isinstance(info['Layers'], list) else [info['Layers']]
-        self.mainLayer: str = info['Main layer'] if 'Main layer' in info.keys() else None
+        # Declaring attributes
+        self.name: str
+        # self.type: str
+        self.layers: list
+        self.main_layer: str
+        # Assigning attribute values based on input
+        self.name = name
+        # self.type = info['Type']
+        self.layers = info['Layers'] if isinstance(info['Layers'], list) else [info['Layers']]
+        self.main_layer = info['Main layer'] if 'Main layer' in info.keys() else None
+        # Checks that the main layer is one of the layers
         self.check_main_layer()
     
     @staticmethod
     def load_unit(name: str, info: dict):
-        match info['type']:
+        match info['Type']:
             case 'Process':
                 return Process(name, info)
             case 'Utility':
-                match info['subtype']:
-                    case 'Standard':
-                        return Utility(name, info)
-                    case 'StorageUnit':
-                        return StorageUnit(name, info)
-                    case 'Market':
-                        return Market(name, info)
+                return StandardUtility(name, info)
+            case 'StorageUnit':
+                return StorageUnit(name, info)
+            case 'Market':
+                return Market(name, info)
+            case 'ChargingUnit': 
+                return ChargingUnit(name, info)
+            case 'DischargingUnit':
+                return DischargingUnit(name, info)
+    
+    def check_default_values(self, info):
+        # Assigns default values for the specific unit type to the related fields
+        data = UNITS_DEFAULT_DATA[info['Type']] | {key: value for key, value in info.items() if key in UNITS_DEFAULT_DATA[info['Type']].keys()}
+        if info['Type'] == 'Process' and 'Power' in data.keys():
+            data['Power'] = self.check_time_dependent_values(data, 'Power')
+        elif info['Type'] == 'StandardUtility':
+            data['Max power'] = self.check_time_dependent_values(data, 'Max power')
+        elif info['Type'] == 'Market':
+            data['Energy price'] = self.check_time_dependent_values(data, 'Energy price')
+        for attribute_name, attribute_value in data.items():
+            setattr(self, attribute_name_converter(attribute_name), attribute_value)
+        
 
     def check_main_layer(self):
         # Checks that the main layer is one of the layers
-        if self.mainLayer:  # If an input value for the "main layer" field was provided, we make sure that it is also one of the layers
-            if self.mainLayer not in self.layers:
-                raise NameError(f"The main layer provided for unit {self.name} is {self.mainLayer} and it is not one of the unit's layers {self.layers}. Please fix this!")
+        if self.main_layer:  # If an input value for the "main layer" field was provided, we make sure that it is also one of the layers
+            if self.main_layer not in self.layers:
+                raise NameError(f"The main layer provided for unit {self.name} is {self.main_layer} and it is not one of the unit's layers {self.layers}. Please fix this!")
         else:
             if len(self.layers) > 1:
                 Warning(f"The main layer for unit {self.name} was not provided. The first layer in the list {self.layers[0]} was used as main layer")
-            self.mainLayer = self.layers[0]
+            self.main_layer = self.layers[0]
 
     def parse_layers(self):
         # This method parses the unit's layers and assigns them to a set of "Layer" objects
         output = set()
         for layer_name in self.layers:
             output.add(Layer(layer_name))
+        return output
+    
+    def check_time_dependent_values(self, info, attribute_name: str):
+        output = {}
+        if isinstance(info[attribute_name], float|int):  # One single value is acceptable only if the process only has one layer
+            if len(self.layers) > 1:
+                raise ValueError(f'Only one value was provided for the input of process {self.name}, \
+                                 while based on the unit layers {len(self.layers)} were required')
+            else:
+                output[self.layers[0]] = [info[attribute_name]]
+        elif isinstance(info[attribute_name], list):  # If the Power field is a list of values, we interpret them as the fixed power values for each layer
+            if len(self.layers) != len(info[attribute_name]):
+                raise ValueError(f'Only {len(info[attribute_name])} values were provided for the input of process {self.name}, \
+                                 while based on the unit layers {len(self.layers)} were required')
+            else:
+                for id, layer in enumerate(self.layers):
+                    output[layer] = [info[attribute_name][id]]
+        elif isinstance(info[attribute_name], str):  # We can also provide a string, it will be interpreted later. If it is 'file' we read the file based on a standard naming
+            output = info[attribute_name]
         return output
 
 
@@ -53,7 +99,12 @@ class Process(Unit):
     """
     def __init__(self, name, info):
         super().__init__(name, info)
-        self.power: dict | str = {}
+        # Declaring attributes
+        self.power: dict | str
+        # Assigining values to attributes
+        self.check_default_values(info)
+        # Power is treated differently
+        self.power = {}
         if isinstance(info['Power'], float|int):  # One single value is acceptable only if the process only has one layer
             if len(self.layers) > 1:
                 raise ValueError(f'Only one value was provided for the input of process {name}, \
@@ -99,28 +150,14 @@ class Utility(Unit):
     """
     def __init__(self, name, info):
         super().__init__(name, info)
-        self.specific_capex: float | int | list = info['Investment cost'] if 'Investment cost' in info.keys() else 0
-        self.lifetime: int | list = info['Lifetime'] if 'Lifetime' in info.keys() else 20
-        self.specific_annualized_capex: float | int = 0.0
-        self.specific_opex: float | int = 0.0
-        self.power_max: dict = {}
-        # Reading power max
-        if isinstance(info['Max power'], list): # If Max power is a list, we assume it has one value per layer, ordered as the layers
-            if len(info['Max power']) == len(self.layers):
-                for id, layer in enumerate(self.layers):
-                    self.power_max[layer] = info['Max power'][id]
-            else:  # Issue an error if the number of values in the list is different from the number of layers
-                raise ValueError(f'The input for the max power of unit {self.name} should be a list of \
-                                 {len(self.layers)} elements based on the layers provided. A list of \
-                                 {len(info["Max power"])} was provided instead')
-        else:  # If only one value is provided, we assume it's because there is only one layer
-            if len(self.layers) == 1:
-                self.power_max[self.layers[0]] = [info['Max power']]
-            else:  # If one value is provided but there are two or more errors, we raise a ValueError
-                raise ValueError(f'The input for the max power of unit {self.name} should be a list of \
-                                 {len(self.layers)} elements based on the layers provided. A single value was \
-                                 provided instead')
-    
+        # Defining class-specific attributes
+        self.specific_capex: float | int | list
+        self.lifetime: int | list
+        self.specific_annualized_capex: float
+        self.specific_opex: float
+        # Assigning values to class-specific attributes
+        self.check_default_values(info)
+
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
         # Calculates the annualization factor
@@ -139,20 +176,27 @@ class StandardUtility(Utility):
     # This class does not add anything to a Utility, it is only used for classification purposes
     def __init__(self, name, info):
         super().__init__(name, info)
+        # We never really define standard utilities as such. 
+        info['Type'] = 'StandardUtility' if info['Type'] == 'Utility' else info['Type']
+        # Defining class-specific attributes
+        self.max_power: dict
+        # Reading class-speficif values
+        self.check_default_values(info)
+
 
 class StorageUnit(Utility):
     def __init__(self, name, info):
         super().__init__(name, info)
-        self.capacity = info['Capacity']
-        self.charging_efficiency: float = info['ChargingEfficiency'] | 1.0
-        self.discharging_efficiency: float = info['DischargingEfficiency'] | 1.0
-        self.c_rate: float = info['Rates'][0] | 1.0
-        self.e_rate: float = info['Rates'][1] | 1.0
-        self.charging_energy_layer: str = info['Layers']
-        self.main_layer: str | None = None
-        self.charging_unit: str = info['ChargingUnitName'] | f'{name}Charger'
-        self.discharging_unit: str | None = info['DischargingUnitName'] | f'{name}Disharger'
-    
+        # Defining class-specific attributes
+        self.max_energy: float | int
+        self.charging_unit_info : dict
+        self.discharging_unit_info : dict
+        self.c_rate: float
+        self.e_rate: float
+        # Reading class-speficif values
+        self.check_default_values(info)
+        self.stored_energy_layer = info['Stored energy layer'] if 'Stored energy layer' in info.keys() else f'Stored{self.layers[0]}'
+
     def create_auxiliary_units(self) -> list:
         # Creates the auxiliary (charging and discharging) units
         charging_unit_info = self.create_charging_unit_info()
@@ -160,52 +204,71 @@ class StorageUnit(Utility):
         return [Unit.load_unit(charging_unit_info['Name'], charging_unit_info), Unit.load_unit(discharging_unit_info['Name'], discharging_unit_info)]
 
     def create_charging_unit_info(self) -> dict:
-        info = {}
-        info['Name'] = self.charging_unit
-        info['Layers'] = self.layers
-        main_layer = self.main_layer | self.layers[0].replace('Stored', '')
-        info['Layers'].append(main_layer)
-        max_power = self.capacity * self.c_rate
-        if self.charging_energy_layer:
-            info['Layers'].append(self.charging_energy_layer)
-            info['MaxPower'] = [max_power, -max_power, -max_power * (1 - self.charging_efficiency)]
-        else:
-            info['MaxPower'] = [max_power * self.charging_efficiency, -max_power]
-        info['Type'] = 'Utility'
-        info['Subtype'] = 'ChargingUtility'
-        return info
+        # Creates the dictionary containing the unit info for the storage charging unit
+        info = self.charging_unit_info
+        output = {}
+        output['Name'] = info['Name'] if 'Name' in info.keys() else f'{self.name}Charger'
+        output['Layers'] = [self.stored_energy_layer] + self.layers
+        if 'Energy requirement layer' in info.keys():
+            output['Energy requirement layer'] = info['Energy requirement layer']
+            output['Layers'].append(info['Energy requirement layer'])
+        output['Main layer'] = info['Main layer'] if 'Main layer' in info.keys() else self.stored_energy_layer
+        output['Type'] = 'ChargingUnit'
+        output['Specific CAPEX'] = info['Specific CAPEX'] if 'Specific CAPEX' in info.keys() else None
+        output['Lifetime'] = info['Lifetime'] if 'Lifetime' in info.keys() else None
+        output['Efficiency'] = info['Efficiency'] if 'Efficiency' in info.keys() else None
+        output['Max charging power'] = self.max_energy * self.c_rate
+        return output
 
     def create_discharging_unit_info(self) -> dict:
-        info = {}
-        info['Name'] = self.discharging_unit
-        max_power = self.capacity * self.e_rate
-        info['MaxPower'] = [-max_power, max_power]
-        info['Layers'] = self.layers
-        main_layer = self.main_layer | self.layers[0].replace('Stored', '')
-        info['Layers'].append(main_layer)
-        info['Type'] = 'Utility'
-        info['Subtype'] = 'DischargingUtility'
-        return info
+        # Creates the dictionary containing the unit info for the storage charging unit
+        info = self.discharging_unit_info
+        output = {}
+        output['Name'] = info['Name'] if 'Name' in info.keys() else f'{self.name}Discharger'
+        output['Layers'] = [self.stored_energy_layer] + self.layers
+        if 'Energy requirement layer' in info.keys():
+            output['Layers'].append(info['Energy requirement layer'])
+        output['Main layer'] = info['Main layer'] if 'Main layer' in info.keys() else self.stored_energy_layer
+        output['Type'] = 'DischargingUnit'
+        output['Specific CAPEX'] = info['Specific CAPEX'] if 'Specific CAPEX' in info.keys() else None
+        output['Lifetime'] = info['Lifetime'] if 'Lifetime' in info.keys() else None
+        output['Efficiency'] = info['Efficiency'] if 'Efficiency' in info.keys() else None
+        output['Max discharging power'] = self.max_energy * self.e_rate
+        return output
 
-class Market(Utility):
+
+class ChargingUnit(StandardUtility):
+    def __init__(self, name, info):
+        super().__init__(name, info)
+        # Defining class-specific attributes
+        self.efficiency: float
+        self.max_charging_power: float
+        # Checking default values
+        self.check_default_values(info)
+        # Assigning values
+        if 'Energy requirement layer' in info.keys():
+            self.max_power = {key: value for key in self.layers for value in [self.max_charging_power, -self.max_charging_power, -self.max_charging_power * (1 - self.efficiency)]}
+        else:
+            self.max_power = {key: value for key in self.layers for value in [self.max_charging_power * self.efficiency, -self.max_charging_power]}
+
+class DischargingUnit(StandardUtility):
+    def __init__(self, name, info):
+        super().__init__(name, info)
+        # Defining class-specific attributes
+        self.efficiency: float
+        self.max_discharging_power: float
+        # Checking default values
+        self.check_default_values(info)
+        # Assigning values
+        if 'Energy requirement layer' in info.keys():
+            self.max_power = {key: value for key in self.layers for value in [-self.max_discharging_power, self.max_discharging_power, -self.max_discharging_power * (1 - self.efficiency)]}
+        else:
+            self.max_power = {key: value for key in self.layers for value in [-self.max_discharging_power, self.max_discharging_power * self.efficiency]}
+
+
+
+class Market(StandardUtility):
     def __init__(self, name, info):
         super().__init__(name, info)
         self.activation_delay = []
         self.energy_price = {}
-        if isinstance(info['EnergyPrice'], list):
-            if len(info['EnergyPrice']) == len(self.layers):
-                for id, layer in self.layers:
-                    self.energy_price[layer] = info['EnergyPrice'][id]
-            else:
-                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of \
-                                 {len(self.layers)} elements based on the layers provided. A list of \
-                                 {len(info["EnergyPrice"])} was provided instead')
-        elif isinstance(info['EnergyPrice'], float) or isinstance(info['EnergyPrice'], int):
-            if len(self.layers) == 1:
-                self.energy_price[self.layers[0]] = [info['MaxPower']]
-            else:
-                raise ValueError(f'The input for the energy price of unit {self.name} should be a list of \
-                                 {len(self.layers)} elements based on the layers provided. A single value was \
-                                 provided instead')
-        elif isinstance(info['EnergyPrice'], str):
-            self.energy_price = info['EnergyPrice']

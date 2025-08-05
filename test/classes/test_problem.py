@@ -27,15 +27,15 @@ def test_read_problem_data():
                       check_input_data=False, 
                       create_problem_folders=False)
     problem.read_problem_data()
-    assert isinstance(problem.problem_data.general_data, dict)
-    assert isinstance(problem.problem_data.unit_data, dict)
-    assert problem.problem_data.general_data['main']['problem_type'] == 'LP'
-    assert problem.problem_data.general_data['main']['objective'] == 'OPEX'
-    assert isinstance(problem.problem_data.general_data['main']['general_parameters'], dict)
-    assert problem.problem_data.unit_data['WindFarm']['Type'] == 'Process'
-    assert problem.problem_data.unit_data['WindFarm']['Power'] == 'file'
-    assert problem.problem_data.unit_data['Market']['Type'] == 'Market'
-    assert problem.problem_data.unit_data['Market']['MaxPower'] == [-10000]
+    assert isinstance(problem.raw_general_data, dict)
+    assert isinstance(problem.raw_unit_data, dict)
+    assert problem.raw_general_data['Settings']['Problem type'] == 'LP'
+    assert problem.raw_general_data['Settings']['Objective'] == 'OPEX'
+    assert isinstance(problem.raw_general_data['Standard parameters'], dict)
+    assert problem.raw_unit_data['WindFarm']['Type'] == 'Process'
+    assert problem.raw_unit_data['WindFarm']['Power'] == 'file'
+    assert problem.raw_unit_data['Market']['Type'] == 'Market'
+    assert problem.raw_unit_data['Market']['Max power'] == [-10000]
 
 def test_process_problem_data():
     # Tests the "process_problem_data" function

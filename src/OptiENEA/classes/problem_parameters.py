@@ -1,3 +1,5 @@
+import OptiENEA.helpers.helpers as helpers
+
 class ProblemParameters:
     # Class containing the problem parameters
 
@@ -11,12 +13,11 @@ class ProblemParameters:
     
     def read_problem_paramters(self, general_data: dict):
         # Reads the problem's general data into the deidcated structure
-        self.interpreter: str = general_data['settings']['Interpreter']
-        self.solver: str = general_data['settings']['Solver']
+        self.interpreter: str = general_data['Settings']['Interpreter']
+        self.solver: str = general_data['Settings']['Solver']
         # Addiing ampl parameters
-        self.interest_rate: float = general_data['standard parameters']['Interest rate']
-        self.simulation_horizon: int = general_data['standard parameters']['NT']
-        self.ampl_parameters["OCCURRENCE"]: list[int] = general_data['standard parameters']['Occurrence'] if isinstance(general_data['standard parameters']['Occurrence'], list) else [general_data['standard parameters']['Occurrence']]
-        self.ampl_parameters["TIME_STEP_DURATION"]: general_data['standard parameters']['Time step duration'] if isinstance(general_data['standard parameters']['Time step duration'], list) else [general_data['standard parameters']['Time step duration']]
-            
+        self.interest_rate: float = general_data['Standard parameters']['Interest rate']
+        self.simulation_horizon: int = general_data['Standard parameters']['NT']
+        self.ampl_parameters["OCCURRENCE"]: list[int] = helpers.safe_to_list(general_data['Standard parameters']['Occurrence'])
+        self.ampl_parameters["TIME_STEP_DURATION"]: helpers.safe_to_list(general_data['Standard parameters']['Time step duration'])
      

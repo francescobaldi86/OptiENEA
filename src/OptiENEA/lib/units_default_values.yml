@@ -1,0 +1,36 @@
+Unit:
+  Type:
+  Layers:
+  Main layer:
+
+Process:
+  Power:
+
+Utility:
+  Specific CAPEX: 0.01
+  Lifetime: 25
+  Specific OPEX: 0.0
+
+StandardUtility:
+  Max power:
+
+StorageUnit:
+  Max energy:
+  Stored energy layer:
+  C-rate: 100.0
+  E-rate: 100.0
+  Charging unit info:
+  Discharging unit info:
+ 
+ChargingUnit:
+  Efficiency: 1.0
+  Max charging power:
+  Energy requirement layer:
+
+DischargingUnit:
+  Efficiency: 1.0
+  Max discharging power:
+  Energy requirement layer:
+
+Market:
+  Energy price:
