@@ -1,4 +1,10 @@
 import pandas as pd
+import os
+
+REQUIRED_STRUCTURE = {
+    'folders': ['input', ],
+    'files': ['input/units.yaml', 'input/general.yml']
+}
 
 def read_config_file(filename: str, data_structure = {}) -> dict:
     """
@@ -116,3 +122,27 @@ def attribute_name_converter(input: str) -> str:
     # This function is used to convert "extensive" attribute names used in the YAML configuration file to 
     # the pure snake-case format used for unit attributes
     return input.replace(" ", "_").replace("-", "_").lower()
+
+class ProjectStructureError(Exception):
+    """Custom exception for project structure errors."""
+    pass
+
+def validate_project_structure(project_path, required=REQUIRED_STRUCTURE):
+    missing_items = []
+
+    # Check required folders
+    for folder in required.get('folders', []):
+        folder_path = os.path.join(project_path, folder)
+        if not os.path.isdir(folder_path):
+            missing_items.append(f"Missing folder: {folder}")
+
+    # Check required files
+    for file in required.get('files', []):
+        file_path = os.path.join(project_path, file)
+        if not os.path.isfile(file_path):
+            missing_items.append(f"Missing file: {file}")
+
+    if missing_items:
+        raise ProjectStructureError(
+            f"Project at '{project_path}' is missing the following:\n" + "\n".join(missing_items)
+        )

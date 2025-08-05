@@ -15,7 +15,7 @@ from OptiENEA.classes.problem_parameters import ProblemParameters
 from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplMod, AmplDat
-from OptiENEA.helpers.helpers import read_data_file
+from OptiENEA.helpers.helpers import read_data_file, validate_project_structure
 
 class Problem:
       # Initialization function
@@ -47,6 +47,7 @@ class Problem:
             """
             Class method that simply runs the model as a whole. Useful once everything is set up to run things quickly
             """
+            validate_project_structure(self.problem_folder)
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
             self.process_problem_data()  # Uses the problem data read before and saves them in the appropriate format
@@ -63,8 +64,8 @@ class Problem:
             """
             Creates the project folders
             """
-            os.mkdir(f'{self.problem_folder}\\Results')
-            os.mkdir(f'{self.problem_folder}\\Latest AMPL files')
+            os.mkdir(os.path.join(self.problem_folder,'Results'))
+            os.mkdir(os.path.join(self.problem_folder,'Latest AMPL files'))
 
       def read_problem_data(self):
             """
@@ -73,9 +74,9 @@ class Problem:
                   - 'units.yml' for data related to problem units
                   - 'general.yml' for general data about the problem
             """
-            with open(f'{self.problem_folder}\\units.yml', 'r') as stream:
+            with open(os.path.join(self.problem_folder, 'Input','units.yml'), 'r') as stream:
                   self.raw_unit_data = yaml.safe_load(stream)
-            with open(f'{self.problem_folder}\\general.yml', 'r') as stream:
+            with open(os.path.join(self.problem_folder, 'Input','general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
       
 
