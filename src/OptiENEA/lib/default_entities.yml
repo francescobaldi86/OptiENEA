@@ -1,0 +1,35 @@
+SETS:
+  0: 
+    - timeSteps
+    - layers
+    - globalLayers
+    - markets
+    - standardUtilities
+    - processes
+    - storageUnits
+  1: 
+    - layersOfUnit
+    - mainLayerOfUnit
+    - chargingUtilitiesOfStorageUnit
+    - dischargingUtilitiesOfStorageUnit
+PARAMETERS:
+  0:
+    - OCCURRANCE
+    - TIME_STEP_DURATION
+    - STORAGE_CYCLIC_ACTIVE
+    - MAX_FRACTION_EMISSIONS
+    - REF_EMISSIONS
+  1:
+    - SPECIFIC_INVESTMENT_COST_ANNUALIZED
+    - CRATE
+    - ERATE
+    - ENERGY_MAX
+    - SELF_DISCHARGE
+  2: 
+    - LAYER_EMISSION_INTENSITY
+    - POWER_MAX
+    - ENERGY_AVERAGE_PRICE
+  3:
+    - POWER
+    - ENERGY_PRICE_VARIATION
+

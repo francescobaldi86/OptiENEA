@@ -100,11 +100,10 @@ class Process(Unit):
     def __init__(self, name, info):
         super().__init__(name, info)
         # Declaring attributes
-        self.power: dict | str
+        self.power: dict = {}
         # Assigining values to attributes
         self.check_default_values(info)
-        # Power is treated differently
-        self.power = {}
+        self.time_dependent_power_profile: bool = True
         if isinstance(info['Power'], float|int):  # One single value is acceptable only if the process only has one layer
             if len(self.layers) > 1:
                 raise ValueError(f'Only one value was provided for the input of process {name}, \
@@ -141,6 +140,12 @@ class Process(Unit):
             return TypeError(f'The input provided for entity {self.name} is {self.power} and \
                          it appears not valid. Please check it! It should be either \
                          a list of values, or a string')
+        for layer in self.layers:
+            if any([isinstance(self.power[layer], float), isinstance(self.power[layer], int)]):
+                pass  # If it's a float or an integer, don't do anything
+            elif isinstance(self.power[layer], list):
+                self.time_dependent_power_profile = True
+                
 
 
 class Utility(Unit):
@@ -218,6 +223,7 @@ class StorageUnit(Utility):
         output['Lifetime'] = info['Lifetime'] if 'Lifetime' in info.keys() else None
         output['Efficiency'] = info['Efficiency'] if 'Efficiency' in info.keys() else None
         output['Max charging power'] = self.max_energy * self.c_rate
+        output['Storage unit'] = self.name
         return output
 
     def create_discharging_unit_info(self) -> dict:
@@ -234,6 +240,7 @@ class StorageUnit(Utility):
         output['Lifetime'] = info['Lifetime'] if 'Lifetime' in info.keys() else None
         output['Efficiency'] = info['Efficiency'] if 'Efficiency' in info.keys() else None
         output['Max discharging power'] = self.max_energy * self.e_rate
+        output['Storage unit'] = self.name
         return output
 
 
@@ -241,6 +248,7 @@ class ChargingUnit(StandardUtility):
     def __init__(self, name, info):
         super().__init__(name, info)
         # Defining class-specific attributes
+        self.storage_unit = info['Storage unit']
         self.efficiency: float
         self.max_charging_power: float
         # Checking default values
@@ -255,6 +263,7 @@ class DischargingUnit(StandardUtility):
     def __init__(self, name, info):
         super().__init__(name, info)
         # Defining class-specific attributes
+        self.storage_unit = info['Storage unit']
         self.efficiency: float
         self.max_discharging_power: float
         # Checking default values

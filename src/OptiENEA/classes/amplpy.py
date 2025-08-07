@@ -1,21 +1,32 @@
-from OptiENEA.classes.problem_parameters import ProblemParameters
+from OptiENEA.classes.parameter import ProblemParameters
 from OptiENEA.classes.unit import Utility, Process, StorageUnit, Market, StandardUtility
 from OptiENEA.classes.objective_function import ObjectiveFunction
 import pandas as pd
-import amplpy
+import amplpy, os, yaml
+from collections import defaultdict
 
-class AmplMod():
+
+class AmplProblem(amplpy.AMPL):
     def __init__(self):
-        self.mod_string = ""
+        super().__init__()
         self.has_storage = False
         self.has_capex = False
         self.units_with_time_dependent_maximum_power = []
         self.layers_with_time_dependent_price = []
         self.units_prased = False
         self.objective_parsed = False
-    
+
     def get_mod_file(self):
         return self.mod_string
+
+    def load_sets_data(self, sets_data):
+        # Writes the problem data to amplpy
+        for s in sets_data:
+            if sets_data.indexed_over:
+                for subset_name, subset_data in s.items():
+                    self.set[s.name][subset_name] = subset_data
+            else:
+                self.set[s.name] = list(s.content)
 
     def parse_problem_units(self, units: list):
         # Parses the problem for finding the key information required to determine 
@@ -48,6 +59,7 @@ class AmplMod():
             self.write_variables()
             self.write_objective()
             self.write_constraints()
+            self.eval(self.mod_string)
         else:
             raise ValueError('You should first parse the problem data, only then you can write the mod file')
 
@@ -202,6 +214,22 @@ class AmplMod():
                     power[dis,l,t] <= 0;\n
             """
         
+    def write_sets_to_amplpy(self, sets):
+        # Writes problem data about sets to amplpy
+        for name, set in sets:
+            if all([set != set(), set != dict()]):
+                self.set[name] = set.content
+
+    def write_parameters_to_amplpy(self, parameters):
+        # Writes the problem data to amplpy
+        for parameter in parameters:
+            if parameter != {}:
+                self.param[parameter.name] = parameter.content
+
+
+
+
+"""
 class AmplDat():
     # Class used to handle data for ampl problem
     def __init__(self, ampl_problem: amplpy.AMPL, mod: AmplMod):
@@ -209,17 +237,12 @@ class AmplDat():
         self.ampl: amplpy.AMPL = ampl_problem
         self.mod: AmplMod = mod
         self.general_parameters: list = []
+        self.sets = {}
         # Initialize sets
-        self.units: list = []
-        self.layers: list = []
-        self.timeSteps: list = []
-        self.processes: list = []
-        self.markets: list = []
-        self.standardUtilities: list = []
-        self.layersOfUnit: dict = {}
-        self.storageUnits: list = []
-        self.chargingUtilitiesOfStorageUnit: dict[list] = {}
-        self.dischargingUtilitiesOfStorageUnit: dict[list] = {}
+        for set_name in PROBLEM_SETS['BASE_SETS']:
+            self.sets[set_name] = Set(set_name)
+        for set_name, indexed_over in PROBLEM_SETS['INDEXED_SETS']:
+            self.sets[set_name] = Set(set_name, indexed_over)
         # Initialize parameters
         self.POWER_MAX = {}
         self.POWER = {}
@@ -234,66 +257,7 @@ class AmplDat():
         if self.mod.has_storage:
             self.ENERGY_MAX, self.CRATE, self.ERATE = {}, {}, {}
             self.STORAGE_CYCLIC_ACTIVE = None
-    
-    def parse_sets_data(self, units: list, layers: list, parameters: ProblemParameters):
-        self.units = [unit.name for unit in units]
-        self.layers = [layer.name for layer in layers]
-        self.timeSteps = [t for t in range(0,parameters.simulation_horizon)]
-        self.processes = [unit.name for unit in units if isinstance(unit, Process)]
-        self.markets = [unit.name for unit in units if isinstance(unit, Market)]
-        self.standardUtilities = [unit.name for unit in units if isinstance(unit, StandardUtility)]
-        self.layersOfUnit = {unit.name: unit.layers for unit in units}
-        # Parsing sets that only exist if there are storage units
-        if self.mod.has_storage:
-            self.storageUnits = [unit.name for unit in units if isinstance(unit, StorageUnit)]
-            self.chargingUtilitiesOfStorageUnit = {unit.name: [unit.chargingUnit] for unit in units if isinstance(unit, StorageUnit)}
-            self.dischargingUtilitiesOfStorageUnit = {unit.name: [unit.dischargingUnit] for unit in units if isinstance(unit, StorageUnit)}
 
-    def write_sets_data_to_amplpy(self):
-        # Writes the problem data to amplpy
-        SETS = ['layers', 'timeSteps', 'processes', 'markets', 'standardUtilities']
-        for s in SETS:
-            self.ampl.set[s] = self.getattr(s)
-        for unit in self.units:
-            self.ampl.set[unit] = self.layersOfUnit[unit]
-        # Writes the storage-related set
-        if self.mod.has_storage:
-            self.ampl['storageUnits'] = self.storageUnits
-            for unit in self.storageUnits:
-                self.ampl['chargingUtilitiesOfStorageUnit'][unit] = self.chargingUtilitiesOfStorageUnit[unit]
-                self.ampl['dischargingUtilitiesOfStorageUnit'][unit] = self.dischargingUtilitiesOfStorageUnit[unit]
-
-    def pars_parameters_data(self, units: list, parameters: ProblemParameters):
-        # Parses data for the parameters
-        # First, general parameters
-        for param_name, param_value in parameters.ampl_parameters.items():
-            self.general_parameters.append(param_name)
-            self.setattr(param_name, param_value)
-        for unit in units:
-            if isinstance(unit, Process):
-                for layer in unit.layers:
-                    self.POWER[unit.name][layer] = list(unit.power[layer])
-            elif isinstance(unit, Utility):
-                self.SPECIFIC_INVESTMENT_COST_ANNUALIZED[unit.name] = unit.specific_annualized_capex
-                self.POWER_MAX[unit.name] = {}
-                for layer in unit.layers:
-                    if unit in self.mod.units_with_time_dependent_maximum_power:
-                        self.POWER_MAX[unit.name][layer] = max(unit.power_max[layer])
-                        self.POWER_MAX_REL[unit.name][layer] = [x / self.POWER_MAX[unit.name][layer] for x in unit.power_max[layer]]
-                    else:
-                        self.POWER_MAX[unit.name][layer] = unit.power_max[layer]
-                    if isinstance(unit, Market):
-                        if layer in self.mod.layers_with_time_dependent_price:
-                            self.ENERGY_PRICE[layer] = sum(unit.energy_price[layer]) / len(unit.energy_price[layer])
-                            self.ENERGY_PRICE_VARIATION[layer] = [x / self.ENERGY_PRICE[layer] for x in unit.energy_price[layer]]
-                        else:
-                            self.ENERGY_PRICE[layer] = unit.energy_price[layer]
-                if isinstance(unit, StorageUnit):
-                    self.ENERGY_MAX[unit.name] = unit.capacity
-                    self.CRATE[unit.name] = unit.c_rate
-                    self.ERATE[unit.name] = unit.e_rate
-            else:
-                raise TypeError(f'Unit {unit.name} has wrong unit type: should be either Process or Utility')
 
     def write_parameters_to_amplpy(self):
         # Writes the problem data to amplpy
@@ -317,3 +281,4 @@ class AmplDat():
             self.ampl.param['ENERGY_MAX'] = self.ENERGY_MAX
             self.ampl.param['CRATE'] = self.CRATE
             self.ampl.param['ERATE'] = self.ERATE
+"""
