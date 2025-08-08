@@ -1,4 +1,3 @@
-from OptiENEA.classes.parameter import ProblemParameters
 from OptiENEA.classes.unit import Utility, Process, StorageUnit, Market, StandardUtility
 from OptiENEA.classes.objective_function import ObjectiveFunction
 import pandas as pd

@@ -30,10 +30,12 @@ class Set:
                 slice.write()
     
     @staticmethod
-    def create_empty_sets(problem_sets):
+    def create_empty_sets():
         """
         Intializes the full list of problem parameters
         """
+        problem_sets = {}
         for level, sets in DEFAULT_ENTITIES['SETS'].items():
             for set in sets:
                 problem_sets[set] = Set(set, level)
+        return problem_sets

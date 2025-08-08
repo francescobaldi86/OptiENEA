@@ -21,10 +21,11 @@ class Parameter:
             raise(ValueError, f'The value for "number of indeces" should be an integer between 0 and 3. {number_of_indeces} was provided for parameter {self.name}')
     
     @staticmethod
-    def create_empty_parameters(problem_parameters):
+    def create_empty_parameters():
         """
         Intializes the full list of problem parameters
         """
+        problem_parameters = {}
         for level, parameters in DEFAULT_ENTITIES['PARAMETERS'].items():
             for param in parameters:
                 problem_parameters[param] = Parameter(param, level)

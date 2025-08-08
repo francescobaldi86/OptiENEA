@@ -7,8 +7,9 @@ Created on Mon Sep 16 10:33:51 2019
 This file describes the classes of the OptiENEA tool
 
 """
-import os
+import os, sys
 from datetime import datetime
+from pathlib import Path
 from OptiENEA.classes.unit import *
 from OptiENEA.classes.set import Set
 from OptiENEA.classes.parameter import Parameter
@@ -20,17 +21,17 @@ from OptiENEA.helpers.helpers import read_data_file, validate_project_structure,
 class Problem:
       # Initialization function
       def __init__(self, name: str, problem_folder = None, temp_folder = None, 
-                   check_input_data = True, create_problem_folders = True):
+                   check_input_data = False, create_problem_folders = True):
             """
             :param: problem_folder        the folder where the main content of the problem is (data, results, etc)
             :param: temp_folder           the temporary folder where temporary data is saved. Useful to specify if problem_folder is on cloud and many simulations are expected
             """
             self.name = name
-            self.problem_folder = problem_folder
+            self.problem_folder = problem_folder or Path(sys.argv[0]).resolve().parent
             self.temp_folder = temp_folder
             self.units: list[Unit] | None = None
             self.sets: dict[Set] | None = Set.create_empty_sets()
-            self.parameters: list[Parameter] | None = Parameter.create_empty_parameters()
+            self.parameters: dict[Parameter] | None = Parameter.create_empty_parameters()
             self.layers: set[Layer] | None = None
             self.raw_unit_data: dict | None = None
             self.raw_general_data : dict | None = None
