@@ -54,6 +54,8 @@ class Problem:
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
             self.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
+            self.parse_sets()
+            self.parse_parameters()
             self.set_objective_function()  # Reads and sets the objective function
             self.create_ampl_model()  # Creates the problem mod file
             self.solve_ampl_problem()  # Solves the optimization problem
@@ -97,7 +99,7 @@ class Problem:
             self.interest_rate = self.raw_general_data['Standard parameters']['Interest rate']
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
             self.ampl_parameters["OCCURRENCE"] = safe_to_list(self.raw_general_data['Standard parameters']['Occurrence'])
-            self.ampl_parameters["TIME_STEP_DURATION"] = safe_to_list(self.raw_general_data['Standard parameters']['Time step duration'])
+            self.ampl_parameters["TIME_STEP_DURATION"] = self.raw_general_data['Standard parameters']['Time step duration']
             # Checking if problem has typical days
             self.has_typical_days = True if len(self.ampl_parameters["OCCURRENCE"]) == 1 else False
       
@@ -122,19 +124,20 @@ class Problem:
                         for aux_unit in aux_units:
                               aux_unit.calculate_annualized_capex(interest_rate = self.interest_rate)  # Calculate its investment cost
                               self.units[aux_unit.name] = aux_unit
-                              self.layers.union(aux_unit.parse_layers())
+                              self.layers = self.layers.union(aux_unit.parse_layers())
                   self.units[unit_name] = new_unit
-                  self.layers.union(new_unit.parse_layers())        
+                  self.layers = self.layers.union(new_unit.parse_layers())        
             
 
       def parse_sets(self):
-            self.sets['timeSteps'] = [int(x) for x in range(self.simulation_horizon, step = self.ampl_parameters['TIME_STEP_DURATION'])]
+            # NOTE: The append method is a method of the class "Set"
+            self.sets['timeSteps'].content.update([int(x) for x in range(0, self.simulation_horizon, self.ampl_parameters['TIME_STEP_DURATION'])])
             for layer in self.layers:
                   self.sets['layers'].append(layer.name)
             for _, unit in self.units.items():
                   for layer in unit.layers:
                         self.sets['layersOfUnit'].append(layer, unit.name)
-                  self.sets['MainLayerOfUnit'].append(unit.main_layer, unit.name)
+                  self.sets['mainLayerOfUnit'].append(unit.main_layer, unit.name)
                   if isinstance(unit, Process):
                         self.sets['processes'].append(unit.name)
                   if isinstance(unit, StandardUtility):
@@ -148,8 +151,6 @@ class Problem:
 
       def parse_parameters(self, units: list):
         # Parses data for the parameters
-        # First, general parameters
-
         for unit in units:
             if isinstance(unit, Process):
                   for layer in unit.layers:

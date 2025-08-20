@@ -73,10 +73,15 @@ def test_read_units_data(problem_with_unit_data):
     assert len(units['WindFarm'].power['Electricity']) == 1  # Only one typical day
     assert len(units['WindFarm'].power['Electricity']['0']) == 8760  # Only one typical day
 
-def test_process_problem_data():
+def test_parse_sets(problem_with_unit_data):
     # Tests the "process_problem_data" function
-    problem = 0
-    assert True
+    problem_with_unit_data.parse_sets()
+    assert problem_with_unit_data.sets['processes'].content == {'WindFarm'}
+    assert problem_with_unit_data.sets['layersOfUnit'].content['BatteryCharger'] == {'Electricity', 'StoredElectricity'}
+    assert problem_with_unit_data.sets['chargingUtilitiesOfStorageUnit'].content['Battery'] == {'BatteryCharger'}
+    assert problem_with_unit_data.sets['mainLayerOfUnit'].content['Market'] == {'Electricity'}
+    assert problem_with_unit_data.sets['layers'].content == {'Electricity', 'StoredElectricity'}
+
 
 
 @pytest.fixture

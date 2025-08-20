@@ -67,7 +67,7 @@ class Unit:
         # This method parses the unit's layers and assigns them to a set of "Layer" objects
         output = set()
         for layer_name in self.layers:
-            output.add(Layer(layer_name))
+            output.add(Layer(name = layer_name))
         return output
     
     def check_time_dependent_values(self, info, attribute_name: str):
