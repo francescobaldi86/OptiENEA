@@ -20,8 +20,7 @@ from OptiENEA.helpers.helpers import read_data_file, validate_project_structure,
 
 class Problem:
       # Initialization function
-      def __init__(self, name: str, problem_folder = None, temp_folder = None, 
-                   check_input_data = False, create_problem_folders = True):
+      def __init__(self, name: str, problem_folder = None, temp_folder = None):
             """
             :param: problem_folder        the folder where the main content of the problem is (data, results, etc)
             :param: temp_folder           the temporary folder where temporary data is saved. Useful to specify if problem_folder is on cloud and many simulations are expected
@@ -29,10 +28,10 @@ class Problem:
             self.name = name
             self.problem_folder = problem_folder or Path(sys.argv[0]).resolve().parent
             self.temp_folder = temp_folder
-            self.units: list[Unit] | None = None
+            self.units: dict[Unit] | None = {}
             self.sets: dict[Set] | None = Set.create_empty_sets()
             self.parameters: dict[Parameter] | None = Parameter.create_empty_parameters()
-            self.layers: set[Layer] | None = None
+            self.layers: set[Layer] | None = set()
             self.raw_unit_data: dict | None = None
             self.raw_general_data : dict | None = None
             self.objective: ObjectiveFunction | None
@@ -46,10 +45,6 @@ class Problem:
             self.simulation_horizon = 8760
             self.ampl_parameters = {"OCCURRENCE": [1], "TIME_STEP_DURATION": [1]}
 
-            if check_input_data:
-                  self.check_input_data()
-            if create_problem_folders:
-                  self.create_folders()
 
       def full_run(self):
             """
@@ -58,8 +53,8 @@ class Problem:
             validate_project_structure(self.problem_folder)
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
-            self.process_problem_data()  # Uses the problem data read before and saves them in the appropriate format
-            # self.generate_amplpy_problem()  # Uses the data to create the amplpy problem
+            self.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
+            self.set_objective_function()  # Reads and sets the objective function
             self.create_ampl_model()  # Creates the problem mod file
             self.solve_ampl_problem()  # Solves the optimization problem
             self.read_output()  # Reads the output generated 
@@ -71,8 +66,11 @@ class Problem:
             """
             Creates the project folders
             """
-            os.mkdir(os.path.join(self.problem_folder,'Results'))
-            os.mkdir(os.path.join(self.problem_folder,'Latest AMPL files'))
+            for folder in ['Results', 'Temporary files']:
+                  try:
+                        os.mkdir(os.path.join(self.problem_folder,folder))
+                  except FileExistsError:
+                        pass  # Insert log
 
       def read_problem_data(self):
             """
@@ -85,51 +83,55 @@ class Problem:
                   self.raw_unit_data = yaml.safe_load(stream)
             with open(os.path.join(self.problem_folder, 'Input','general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
+            self.raw_timeseries_data = pd.read_csv(
+                  os.path.join(self.problem_folder, 'Input', 'timeseries_data.csv'), 
+                  header = [0,1,2], 
+                  index_col = 0, 
+                  sep = ";")
      
-      def read_problem_paramters(self, general_data: dict):
+      def read_problem_parameters(self):
             # Reads the problem's general data into the deidcated structure
-            self.interpreter = general_data['Settings']['Interpreter']
-            self.solver = general_data['Settings']['Solver']
+            self.interpreter = self.raw_general_data['Settings']['Interpreter']
+            self.solver = self.raw_general_data['Settings']['Solver']
             # Addiing ampl parameters
-            self.interest_rate = general_data['Standard parameters']['Interest rate']
-            self.simulation_horizon: int = general_data['Standard parameters']['NT']
-            self.ampl_parameters["OCCURRENCE"] = safe_to_list(general_data['Standard parameters']['Occurrence'])
-            self.ampl_parameters["TIME_STEP_DURATION"] = safe_to_list(general_data['Standard parameters']['Time step duration'])
+            self.interest_rate = self.raw_general_data['Standard parameters']['Interest rate']
+            self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
+            self.ampl_parameters["OCCURRENCE"] = safe_to_list(self.raw_general_data['Standard parameters']['Occurrence'])
+            self.ampl_parameters["TIME_STEP_DURATION"] = safe_to_list(self.raw_general_data['Standard parameters']['Time step duration'])
+            # Checking if problem has typical days
+            self.has_typical_days = True if len(self.ampl_parameters["OCCURRENCE"]) == 1 else False
       
 
-      def process_problem_data(self):
+      def read_units_data(self):
             """
             Processes the problem data read by read_problem_data (which is basically a multi-level dictionary)
             Units and general are read separately
-            """
-            # Checking if the problem has typical days
-            self.has_typical_days = True if len(self.problem_parameters.ampl_parameters["OCCURRENCE"] == 1) else False
+            """            
             # Processing units data
-            for unit_name, unit_info in self.raw_unit_data():
+            for unit_name, unit_info in self.raw_unit_data.items():
                   new_unit = Unit.load_unit(unit_name, unit_info)  # Create the new unit
                   # Check some specific cases
                   if isinstance(new_unit, StandardUtility):
-                        new_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)  # Calculate its investment cost
+                        new_unit.calculate_annualized_capex(interest_rate = self.interest_rate)  # Calculate its investment cost
                   elif isinstance(new_unit, Process): # If it is a process, we also check the power input (we might need to read another file)
-                        new_unit.power = new_unit.check_power_input(self.problem_folder, self.has_typical_days)
+                        new_unit.check_power_input(self.raw_timeseries_data)
                   elif isinstance(new_unit, Market): # If it is a market unit, we might need to read a file with time-dependent energy prices
-                        self.energy_price = read_data_file(new_unit.energy_price, new_unit.name, self.problem_folder)
+                        new_unit.read_energy_prices(self.raw_timeseries_data)
                   elif isinstance(new_unit, StorageUnit): # If it is a storage unit, let's also add the related charging and discharging units
                         aux_units = new_unit.create_auxiliary_units()
                         for aux_unit in aux_units:
-                              aux_unit.calculate_annualized_capex(interest_rate = self.parameters.interest_rate)  # Calculate its investment cost
-                              self.units.append(aux_unit)
+                              aux_unit.calculate_annualized_capex(interest_rate = self.interest_rate)  # Calculate its investment cost
+                              self.units[aux_unit.name] = aux_unit
                               self.layers.union(aux_unit.parse_layers())
-                  self.units.append(new_unit)
+                  self.units[unit_name] = new_unit
                   self.layers.union(new_unit.parse_layers())        
-            # Add problem objective function
-            self.set_objective_function()
+            
 
       def parse_sets(self):
             self.sets['timeSteps'] = [int(x) for x in range(self.simulation_horizon, step = self.ampl_parameters['TIME_STEP_DURATION'])]
             for layer in self.layers:
                   self.sets['layers'].append(layer.name)
-            for unit in self.units:
+            for _, unit in self.units.items():
                   for layer in unit.layers:
                         self.sets['layersOfUnit'].append(layer, unit.name)
                   self.sets['MainLayerOfUnit'].append(unit.main_layer, unit.name)
@@ -184,11 +186,13 @@ class Problem:
             # Based on the available information, create the mod file
             self.ampl_problem.parse_problem_units(self.units)
             self.ampl_problem.parse_problem_objective(self.objective)
+            self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary folder', f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}')
+            os.mkdir(self.ampl_problem.temp_folder)
             self.ampl_problem.write_mod_file()
             self.ampl_problem.write_sets_to_amplpy()
             self.ampl_problem.write_parameters_to_amplpy()
-            self.ampl_problem.export_model(os.path.join(self.temp_folder, 'modfile.mod'))
-            self.ampl_problem.export_data(os.path.join(self.temp_folder, 'datfile.dat'))
+            self.ampl_problem.export_model(os.path.join(self.ampl_problem.temp_folder, 'modfile.mod'))
+            self.ampl_problem.export_data(os.path.join(self.ampl_problem.temp_folder, 'datfile.dat'))
       
       def solve_ampl_problem(self):
             """

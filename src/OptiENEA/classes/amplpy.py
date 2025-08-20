@@ -165,8 +165,8 @@ class AmplProblem(amplpy.AMPL):
            """
         # Constraints to be added depending on whether energy prices depend on the time step or not
         if len(self.layers_with_time_dependent_price) > 0:
-            self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]: l in layersWithFixedPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
-            self.mod_string += "s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]: l in layersWithTimeDependentPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l] * ENERGY_PRICE_VARIATION[l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n"
+            # self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]: l in layersWithFixedPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
+            self.mod_string += "s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l] * ENERGY_PRICE_VARIATION[l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n"
         else: 
             self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not

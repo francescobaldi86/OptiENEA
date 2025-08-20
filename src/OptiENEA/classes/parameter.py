@@ -29,4 +29,4 @@ class Parameter:
         for level, parameters in DEFAULT_ENTITIES['PARAMETERS'].items():
             for param in parameters:
                 problem_parameters[param] = Parameter(param, level)
-
+        return problem_parameters

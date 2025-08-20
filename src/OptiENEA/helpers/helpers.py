@@ -93,7 +93,7 @@ def reference_or_updated(tuple_name, simulation_data, problem, type):
         elif type == "extra":
             return problem.parameters["extra"][tuple_name][0]
         
-def read_data_file(input: str, entity_name: str, problem_folder = None) -> pd.DataFrame: 
+def read_data_file(input: str, unit_name: str, layer_name: str, problem_folder: str = None) -> pd.DataFrame: 
     """
     Reads the file_input string. If it is "file" creates the input file name
     based on unit_name and project folder. Else, it expects the file_input
@@ -105,16 +105,16 @@ def read_data_file(input: str, entity_name: str, problem_folder = None) -> pd.Da
     if input == 'file':
         if problem_folder:
             return pd.read_csv(
-                f'{problem_folder}\\data\\{entity_name}.csv', 
+                f'{problem_folder}\\data\\{unit_name}.csv', 
                 index_col=0, 
-                header=0)
+                header=0)[layer_name]
         else:
             raise ValueError(f'If the input value for the data is "file", then a real problem folder needs to be provided')
     else:
         if input[-4:] != '.csv':
             raise TypeError(f"The file provided should have a .csv format. {input} was provided instead")
         try:
-            return pd.read_csv(input, index_col=0, header=0)
+            return pd.read_csv(input, index_col=0, header=0)[layer_name]
         except:
             FileNotFoundError(f'File at location {input} was not found')
 

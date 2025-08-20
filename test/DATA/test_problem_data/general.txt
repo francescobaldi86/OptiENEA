@@ -1,1 +1,0 @@
-% settingsProblem name; "Test problem"Interpreter; "ampl"Solver; "cplexamp"Objective; "OPEX"% standard parametersInterest rate; 0.07NT; 8760Occurrence; 1Time step duration; 1

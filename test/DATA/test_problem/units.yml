@@ -8,30 +8,17 @@ Market:
   Layers: [Electricity]
   Main layer: Electricity
   Price: [0.0478]  # Units are kEUR/MWh, kEUR/MWh, kEUR/ton
-  Time dependent price: file
   Max power: [-10000]
   Activation frequency: [1]
     
 Battery:
   Type: StorageUnit
+  Layers: Electricity
   Max energy: 10000
   Specific CAPEX: 160
   C-rate: 1.0
   E-rate: 1.5
-  Charge unit info:
+  Charging unit info:
     Efficiency: 0.94
-  Discharge unit:
+  Discharging unit info:
     Efficiency: 0.96
-        
-LHS:
-  Type: StorageUnit
-  Max energy: 50000
-  Investment cost: 57
-  C-rate: 100.0
-  E-rate: 100.0
-  Charging unit:
-    Name: HydrogenLiquefactionUnit
-    Efficiency: 0.74
-    Investment cost: 1400
-  Discharging unit:
-    Efficiency: 1.0
