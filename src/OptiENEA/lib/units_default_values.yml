@@ -33,4 +33,4 @@ DischargingUnit:
   Energy requirement layer:
 
 Market:
-  Energy price:
+  Energy price: 0.0

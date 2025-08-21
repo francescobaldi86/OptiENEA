@@ -12,13 +12,31 @@ from datetime import datetime
 from pathlib import Path
 from OptiENEA.classes.unit import *
 from OptiENEA.classes.set import Set
-from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplProblem
-from OptiENEA.helpers.helpers import read_data_file, validate_project_structure, safe_to_list
+from OptiENEA.helpers.helpers import read_data_file, validate_project_structure, safe_to_list, dict_tree, to_dict
 
 class Problem:
+      name: str
+      problem_folder: str
+      temp_folder: str
+      units: dict[Unit] | None
+      sets: dict[Set] | None
+      parameters: dict
+      layers: set[Layer] | None
+      raw_unit_data: dict | None
+      raw_general_data : dict | None
+      objective: ObjectiveFunction | None
+      ampl_problem: AmplProblem
+      has_typical_days: bool
+      number_of_typical_days: int
+      interpreter: str
+      solver: str
+      interest_rate: float
+      simulation_horizon: int
+      ampl_parameters : dict
+
       # Initialization function
       def __init__(self, name: str, problem_folder = None, temp_folder = None):
             """
@@ -28,18 +46,14 @@ class Problem:
             self.name = name
             self.problem_folder = problem_folder or Path(sys.argv[0]).resolve().parent
             self.temp_folder = temp_folder
-            self.units: dict[Unit] | None = {}
-            self.sets: dict[Set] | None = Set.create_empty_sets()
-            self.parameters: dict[Parameter] | None = Parameter.create_empty_parameters()
-            self.layers: set[Layer] | None = set()
-            self.raw_unit_data: dict | None = None
-            self.raw_general_data : dict | None = None
-            self.objective: ObjectiveFunction | None
-            self.ampl_problem = AmplProblem()
-            self.has_typical_days: bool = False
-
-            self.interpreter: str = 'ampl'
-            self.solver: str = 'highs'
+            self.units = {}
+            self.sets = Set.create_empty_sets()
+            self.parameters = dict_tree()
+            self.layers = set()
+            self.ampl_problem = AmplProblem(self)
+            self.number_of_typical_days: int
+            self.interpreter = 'ampl'
+            self.solver = 'highs'
             # Addiing ampl parameters
             self.interest_rate = 0.06
             self.simulation_horizon = 8760
@@ -87,7 +101,7 @@ class Problem:
                   self.raw_general_data = yaml.safe_load(stream)
             self.raw_timeseries_data = pd.read_csv(
                   os.path.join(self.problem_folder, 'Input', 'timeseries_data.csv'), 
-                  header = [0,1,2], 
+                  header = [0,1,2,3], 
                   index_col = 0, 
                   sep = ";")
      
@@ -102,6 +116,7 @@ class Problem:
             self.ampl_parameters["TIME_STEP_DURATION"] = self.raw_general_data['Standard parameters']['Time step duration']
             # Checking if problem has typical days
             self.has_typical_days = True if len(self.ampl_parameters["OCCURRENCE"]) == 1 else False
+            self.number_of_typical_days = len(self.ampl_parameters["OCCURRENCE"])
       
 
       def read_units_data(self):
@@ -110,23 +125,34 @@ class Problem:
             Units and general are read separately
             """            
             # Processing units data
+            # first we parse Storage Units, so to add the corresponding charging and discharging units to the list
             for unit_name, unit_info in self.raw_unit_data.items():
-                  new_unit = Unit.load_unit(unit_name, unit_info)  # Create the new unit
-                  # Check some specific cases
-                  if isinstance(new_unit, StandardUtility):
-                        new_unit.calculate_annualized_capex(interest_rate = self.interest_rate)  # Calculate its investment cost
-                  elif isinstance(new_unit, Process): # If it is a process, we also check the power input (we might need to read another file)
-                        new_unit.check_power_input(self.raw_timeseries_data)
-                  elif isinstance(new_unit, Market): # If it is a market unit, we might need to read a file with time-dependent energy prices
-                        new_unit.read_energy_prices(self.raw_timeseries_data)
-                  elif isinstance(new_unit, StorageUnit): # If it is a storage unit, let's also add the related charging and discharging units
-                        aux_units = new_unit.create_auxiliary_units()
-                        for aux_unit in aux_units:
-                              aux_unit.calculate_annualized_capex(interest_rate = self.interest_rate)  # Calculate its investment cost
-                              self.units[aux_unit.name] = aux_unit
-                              self.layers = self.layers.union(aux_unit.parse_layers())
+                  auxiliary_units = {}
+                  if unit_info['Type'] == 'StorageUnit':
+                        charging_unit_info = StorageUnit.create_auxiliary_unit_info(unit_name, unit_info, 'Charging')
+                        discharging_unit_info = StorageUnit.create_auxiliary_unit_info(unit_name, unit_info, 'Discharging')
+                        auxiliary_units.update({charging_unit_info['Name']: charging_unit_info})
+                        auxiliary_units.update({discharging_unit_info['Name']: discharging_unit_info})
+            self.raw_unit_data.update(auxiliary_units)
+            for unit_name, unit_info in self.raw_unit_data.items():
+                  new_unit = self.load_unit(unit_name, unit_info)  # Create the new unit
                   self.units[unit_name] = new_unit
-                  self.layers = self.layers.union(new_unit.parse_layers())        
+                  self.layers = self.layers.union(new_unit.parse_layers())
+      
+      def load_unit(self, name: str, info: dict):
+            match info['Type']:
+                  case 'Process':
+                        return Process(name, info, self)
+                  case 'Utility':
+                        return StandardUtility(name, info, self)
+                  case 'StorageUnit':
+                        return StorageUnit(name, info, self)
+                  case 'Market':
+                        return Market(name, info, self)
+                  case 'ChargingUnit': 
+                        return ChargingUnit(name, info, self)
+                  case 'DischargingUnit':
+                        return DischargingUnit(name, info, self)   
             
 
       def parse_sets(self):
@@ -149,38 +175,41 @@ class Problem:
                   if isinstance(unit, DischargingUnit):
                         self.sets['dischargingUtilitiesOfStorageUnit'].append(unit.name, unit.storage_unit)
 
-      def parse_parameters(self, units: list):
+      def parse_parameters(self):
         # Parses data for the parameters
-        for unit in units:
-            if isinstance(unit, Process):
-                  for layer in unit.layers:
-                        if unit.time_dependent_power_profile:
-                              for ts in range(len(unit.power[layer])):
-                                    self.parameters['POWER'][unit.name][layer][ts] = unit.power[layer][ts]
-                        else:
-                             for ts in range(len(unit.power[layer])):
-                                    self.parameters['POWER'][unit.name][layer][ts] = unit.power[layer]
-            elif isinstance(unit, Utility):
-                self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'][unit.name] = unit.specific_annualized_capex
-                self.parameters['POWER_MAX'][unit.name] = {}
-                for layer in unit.layers:
-                    if unit in self.mod.units_with_time_dependent_maximum_power:
-                        self.parameters['POWER_MAX'][unit.name][layer] = max(unit.power_max[layer])
-                        self.parameters['POWER_MAX_REL'][unit.name][layer] = [x / self.POWER_MAX[unit.name][layer] for x in unit.power_max[layer]]
-                    else:
-                        self.parameters['POWER_MAX'][unit.name][layer] = unit.power_max[layer]
-                    if isinstance(unit, Market):
-                        if layer in self.mod.layers_with_time_dependent_price:
-                            self.parameters['ENERGY_PRICE'][layer] = sum(unit.energy_price[layer]) / len(unit.energy_price[layer])
-                            self.parameters['ENERGY_PRICE_VARIATION'][layer] = [x / self.parameters['ENERGY_PRICE'][layer] for x in unit.energy_price[layer]]
-                        else:
-                            self.parameters['ENERGY_PRICE'][layer] = unit.energy_price[layer]
-                if isinstance(unit, StorageUnit):
-                    self.parameters['ENERGY_MAX'][unit.name] = unit.capacity
-                    self.parameters['CRATE'][unit.name] = unit.c_rate
-                    self.parameters['ERATE'][unit.name] = unit.e_rate
-            else:
-                raise TypeError(f'Unit {unit.name} has wrong unit type: should be either Process Utility, or StorageUnit')
+            for unit_name, unit in self.units.items():
+                  if isinstance(unit, Process):
+                        for layer in unit.layers:
+                              if isinstance(unit.power[layer], dict):
+                                    for td in range(self.number_of_typical_days):
+                                          for ts in range(len(unit.power[layer][str(td)])):
+                                                self.parameters['POWER'][unit_name][layer][td][ts] = unit.power[layer][str(td)][ts]
+                              else:
+                                    for td in range(self.number_of_typical_days):
+                                          for ts in range(self.simulation_horizon):
+                                                self.parameters['POWER'][unit_name][layer][td][ts] = unit.power[layer]
+                  elif isinstance(unit, Utility):
+                        self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'][unit_name] = unit.specific_annualized_capex
+                        if isinstance(unit, StandardUtility):
+                              for layer in unit.layers:
+                                    if isinstance(unit.max_power[layer], dict):
+                                          self.parameters['POWER_MAX'][unit_name][layer] = max(unit.max_power[layer])
+                                          self.parameters['POWER_MAX_REL'][unit_name][layer] = [x / self.POWER_MAX[unit_name][layer] for x in unit.max_power[layer]]
+                                    else:
+                                          self.parameters['POWER_MAX'][unit_name][layer] = unit.max_power[layer]
+                                    if isinstance(unit, Market):
+                                          self.parameters['ENERGY_PRICE'][layer] = unit.energy_price[layer]
+                                          if unit.energy_price_variation[layer]:
+                                                for td in range(self.number_of_typical_days):
+                                                      for ts in range(len(unit.power[layer])):
+                                                            self.parameters['ENERGY_PRICE_VARIATION'][unit_name][layer][td][ts] = unit.energy_price_variation[layer][str(td)][ts]
+                        elif isinstance(unit, StorageUnit):
+                              self.parameters['ENERGY_MAX'][unit_name] = unit.max_energy
+                              self.parameters['CRATE'][unit_name] = unit.c_rate
+                              self.parameters['ERATE'][unit_name] = unit.e_rate
+                  else:
+                        raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process Utility, or StorageUnit')
+            self.parameters = to_dict(self.parameters)  # Transforms the type from "defaultdict" to "dict", for clarity
 
       
       def create_ampl_model(self):

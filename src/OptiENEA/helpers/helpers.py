@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from collections import defaultdict
 
 REQUIRED_STRUCTURE = {
     'folders': ['input', ],
@@ -146,3 +147,11 @@ def validate_project_structure(project_path, required=REQUIRED_STRUCTURE):
         raise ProjectStructureError(
             f"Project at '{project_path}' is missing the following:\n" + "\n".join(missing_items)
         )
+    
+def dict_tree():
+    return defaultdict(dict_tree)
+
+def to_dict(d):
+    if isinstance(d, defaultdict):
+        return {k: to_dict(v) for k, v in d.items()}
+    return d

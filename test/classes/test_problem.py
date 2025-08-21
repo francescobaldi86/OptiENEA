@@ -5,6 +5,7 @@ from OptiENEA.classes.amplpy import AmplProblem
 from OptiENEA.classes.unit import *
 import os, pytest, shutil
 from datetime import datetime
+from collections import defaultdict
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
 __PARENT__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -16,12 +17,13 @@ def test_create_empty_problem():
     assert isinstance(problem.sets, dict)
     assert isinstance(problem.sets['timeSteps'], Set)
     assert isinstance(problem.parameters, dict)
-    assert isinstance(problem.parameters['POWER'], Parameter)
+    assert isinstance(problem.parameters['POWER'], defaultdict)
     assert isinstance(problem.ampl_problem, AmplProblem)
 
 
 def test_create_problem_folders():
     # Once the problem has been created, it tests the creation of the related folders
+    os.mkdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem'))  
     problem = Problem(name = 'test_problem', 
                       problem_folder = os.path.join(__PARENT__,'PLAYGROUND','test_problem'))
     problem.create_folders()
@@ -32,6 +34,7 @@ def test_create_problem_folders():
 
     os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem', 'Results'))
     os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem', 'Temporary files'))
+    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem'))
     
 
 def test_read_problem_data(problem_with_data):
@@ -57,7 +60,7 @@ def test_read_problem_parameters(problem_with_general_parameters):
     assert problem.interest_rate == 0.07
     assert problem.simulation_horizon == 8760
     assert problem.ampl_parameters["OCCURRENCE"] == [1]
-    assert problem.ampl_parameters["TIME_STEP_DURATION"] == [1]
+    assert problem.ampl_parameters["TIME_STEP_DURATION"] == 1
 
 
 def test_read_units_data(problem_with_unit_data):
@@ -81,6 +84,19 @@ def test_parse_sets(problem_with_unit_data):
     assert problem_with_unit_data.sets['chargingUtilitiesOfStorageUnit'].content['Battery'] == {'BatteryCharger'}
     assert problem_with_unit_data.sets['mainLayerOfUnit'].content['Market'] == {'Electricity'}
     assert problem_with_unit_data.sets['layers'].content == {'Electricity', 'StoredElectricity'}
+
+def test_parse_parameters(problem_with_unit_data):
+    # Tests the "process_problem_data" function
+    problem_with_unit_data.parse_parameters()
+    assert len(problem_with_unit_data.parameters['POWER']) == 1
+    assert problem_with_unit_data.parameters['POWER']['WindFarm']['Electricity'][0][3] == 43.688
+    assert problem_with_unit_data.ampl_parameters['OCCURRENCE'][0] == 1
+    assert problem_with_unit_data.parameters['CRATE']['Battery'] == 1.0
+    assert problem_with_unit_data.parameters['ENERGY_PRICE']['Electricity'] == 0.0478
+
+def test_create_ampl_problem(problem_with_all_data):
+    problem_with_all_data.create_ampl_model()
+    assert True
 
 
 
@@ -116,4 +132,11 @@ def problem_with_general_parameters(problem_with_data):
 @pytest.fixture
 def problem_with_unit_data(problem_with_general_parameters):
     problem_with_general_parameters.read_units_data()
+    return problem_with_general_parameters
+
+@pytest.fixture
+def problem_with_all_data(problem_with_general_parameters):
+    problem_with_general_parameters.read_units_data()
+    problem_with_general_parameters.parse_sets()
+    problem_with_general_parameters.parse_parameters()
     return problem_with_general_parameters

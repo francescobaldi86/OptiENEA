@@ -6,14 +6,21 @@ from collections import defaultdict
 
 
 class AmplProblem(amplpy.AMPL):
-    def __init__(self):
+    has_storage: bool
+    has_capex: bool
+    has_time_dependent_power: bool
+    has_time_dependent_max_power: bool
+    has_time_dependent_energy_prices: bool
+    units_parsed: bool
+    objective_parsed: bool
+    units_with_time_dependent_maximum_power: list
+    layers_with_time_dependent_price: list
+
+    def __init__(self, problem):
         super().__init__()
-        self.has_storage = False
-        self.has_capex = False
         self.units_with_time_dependent_maximum_power = []
         self.layers_with_time_dependent_price = []
-        self.units_prased = False
-        self.objective_parsed = False
+        self.problem = problem
 
     def get_mod_file(self):
         return self.mod_string
@@ -27,6 +34,22 @@ class AmplProblem(amplpy.AMPL):
             else:
                 self.set[s.name] = list(s.content)
 
+    def parse_problem_settings(self):
+        for _, unit in self.problem.units.items():
+            if isinstance(unit, Process):
+                if unit.has_time_dependent_power:
+                    self.has_time_dependent_power = True
+            if isinstance(unit, StorageUnit):
+                self.has_storage = True
+            if isinstance(unit, Market):
+                if unit.has_variable_energy_prices:
+                    self.has_time_dependent_energy_prices = True
+            if isinstance(unit, Utility):
+                if unit.specific_capex >= 1:
+                    self.has_capex = True
+                if unit.has_time_dependent_max_power:
+                    self.has_time_dependent_max_power = True
+
     def parse_problem_units(self, units: list):
         # Parses the problem for finding the key information required to determine 
         # what is needed for the definition of the mod file
@@ -35,14 +58,7 @@ class AmplProblem(amplpy.AMPL):
                 if unit.specific_capex > 0.0:
                     self.has_capex = True  # Checks if the problem should calculate the CAPEX
                 if isinstance(unit, StorageUnit):
-                    self.has_storage = True  # Checks if there is any storage unit
-                if isinstance(unit.power_max, pd.DataFrame):
-                    self.units_with_time_dependent_maximum_power.append(unit.name)
-                if isinstance(unit, Market):
-                    if isinstance(unit.energy_price, pd.DataFrame):
-                        for layer in unit.layers:
-                            self.layers_with_time_dependent_price.append(layer.name)
-                            
+                    self.has_storage = True  # Checks if there is any storage unit                            
         self.units_parsed = True
     
     def parse_problem_objective(self, objective: ObjectiveFunction):
@@ -88,10 +104,10 @@ class AmplProblem(amplpy.AMPL):
                 "set utilities := standardUtilities union markets;\n",
                 "set utilities := standardUtilities union markets union storageUnits;\n",
             )
-        if len(self.units_with_time_dependent_maximum_power) > 0:
+        if self.has_time_dependent_max_power:
             self.mod_string += "utilitiesWithTimeDependentMaxPower within utilities;\n"
             self.mod_string += "utilitiesWithFixedMaxPower: utilities diff utilitiesWithTimeDependentMaxPower;\n"
-        if len(self.layers_with_time_dependent_price) > 0:
+        if self.has_time_dependent_energy_prices > 0:
             self.mod_string += "layersWithTimeDependentPrice within layers;\n" 
             self.mod_string += "layersWithFixedPrice: layers diff layersWithTimeDependentPrice;\n"
 
@@ -104,10 +120,10 @@ class AmplProblem(amplpy.AMPL):
             param OCCURRANCE;\n
             param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;\n
             param ENERGY_PRICE{l in layers} default 0;\n
+            param ENERGY_PRICE_VARIATION{l in layersWithTimeDependentPrice, t in timeSteps} default 1;\n
         """
-        if len(self.layers_with_time_dependent_price) > 0:
-            self.mod_string += "param ENERGY_PRICE_VARIATION{l in layersWithTimeDependentPrice, t in timeSteps} default 1;\n"
-        if len(self.units_with_time_dependent_maximum_power):
+            
+        if self.has_time_dependent_max_power:
             self.mod_string += "param POWER_MAX_REL{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps} default 1;\n"
         if self.has_storage:
             self.mod_string += """
@@ -164,13 +180,13 @@ class AmplProblem(amplpy.AMPL):
                 s.t. calculate_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];
            """
         # Constraints to be added depending on whether energy prices depend on the time step or not
-        if len(self.layers_with_time_dependent_price) > 0:
+        if self.has_time_dependent_energy_prices > 0:
             # self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]: l in layersWithFixedPrice}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
             self.mod_string += "s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l] * ENERGY_PRICE_VARIATION[l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n"
         else: 
             self.mod_string += "s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]}: layer_operating_cost[l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_PRICE[l]) * TIME_STEP_DURATION * OCCURRANCE;\n"
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
-        if len(self.units_with_time_dependent_maximum_power) > 0:
+        if self.has_time_dependent_max_power > 0:
             self.mod_string += "s.t. component_load_standard{u in standardUtilities, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];"
             self.mod_string += "s.t. component_load_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];"
             self.mod_string += "s.t. market_limits_standard{u in markets, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: POWER_MAX[u,l] <= power[u,l,t] <= 0;"

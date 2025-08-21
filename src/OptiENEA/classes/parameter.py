@@ -17,8 +17,10 @@ class Parameter:
             self.content = defaultdict(dict)
         elif number_of_indeces == 3:
             self.content = defaultdict(lambda: defaultdict(dict))
+        elif number_of_indeces == 4:
+            self.content = defaultdict(lambda: defaultdict(dict))
         else:
-            raise(ValueError, f'The value for "number of indeces" should be an integer between 0 and 3. {number_of_indeces} was provided for parameter {self.name}')
+            raise(ValueError, f'The value for "number of indeces" should be an integer between 0 and 4. {number_of_indeces} was provided for parameter {self.name}')
     
     @staticmethod
     def create_empty_parameters():

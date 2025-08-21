@@ -15,32 +15,20 @@ class Unit:
     name: str
     layers: list
     main_layer: str
-    info: {}
+    info: dict
+    ts_data: pd.DataFrame | None
     
-    def __init__(self, name, info):
+    def __init__(self, name, info, problem):
         # Assigning attribute values based on input
         self.name = name
         self.layers = info['Layers'] if isinstance(info['Layers'], list) else [info['Layers']]
         self.main_layer = info['Main layer'] if 'Main layer' in info.keys() else None
         # Checks that the main layer is one of the layers
         self.info = info
+        self.problem = problem
         self.check_main_layer()
+        self.ts_data = problem.raw_timeseries_data.loc[:, (name)] if name in problem.raw_timeseries_data.columns else None
     
-    @staticmethod
-    def load_unit(name: str, info: dict):
-        match info['Type']:
-            case 'Process':
-                return Process(name, info)
-            case 'Utility':
-                return StandardUtility(name, info)
-            case 'StorageUnit':
-                return StorageUnit(name, info)
-            case 'Market':
-                return Market(name, info)
-            case 'ChargingUnit': 
-                return ChargingUnit(name, info)
-            case 'DischargingUnit':
-                return DischargingUnit(name, info)
     
     def check_default_values(self, unit_type):
         # Assigns default values for the specific unit type to the related fields
@@ -95,46 +83,44 @@ class Process(Unit):
     """
     The process is a subclass of Unit. It models a unit for which the power is fixed
     """
-    time_dependent_power_profile: bool = True
-    power: dict = {}
+    has_time_dependent_power: bool
+    power: dict
 
-    def __init__(self, name, info):
-        super().__init__(name, info)    
+    def __init__(self, name, info, problem):
+        super().__init__(name, info, problem)  
+        self.power = {}
+        self.has_time_dependent_power = False
         # Assigining values to attributes
         self.check_default_values('Process')
-        if isinstance(info['Power'], float|int):  # One single value is acceptable only if the process only has one layer
-            if len(self.layers) > 1:
-                raise ValueError(f'Only one value was provided for the input of process {name}, \
-                                 while based on the unit layers {len(self.layers)} were required')
+        # If the process has only one layer, the input can be a single float
+        self.read_power_input()
+                
+    def read_power_input(self):
+        if len(self.layers) == 1:  # One single value is acceptable only if the process only has one layer
+            if isinstance(self.info['Power'], float|int):
+                self.power[self.layers[0]] = [self.info['Power']]
+            elif isinstance(self.info['Power'], list):
+                if len(self.info['Power']) == 1:
+                    self.power[self.layers[0]] = self.info['Power']
+                else:
+                    raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
+            elif self.info['Power'] == 'file':
+                self.power[self.layers[0]] = self.ts_data.loc[:, ('Power', self.layers[0])].to_dict()
+                self.has_time_dependent_power = True
             else:
-                self.power[self.layers[0]] = [info['Power']]
-        elif isinstance(info['Power'], list):  # If the Power field is a list of values, we interpret them as the fixed power values for each layer
-            if len(self.layers) != len(info['Power']):
-                raise ValueError(f'Only {len(info['Power'])} values were provided for the input of process {name}, \
-                                 while based on the unit layers {len(self.layers)} were required')
-            else:
+                raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
+        elif isinstance(self.info['Power'], list):
+            if len(self.info['Power']) == len(self.layers):
                 for id, layer in enumerate(self.layers):
-                    self.power[layer] = [info['Power'][id]]
-        elif isinstance(info['Power'], str):  # We can also provide a string, it will be interpreted later. If it is 'file' we read the file based on a standard naming
-            self.power = info['Power']
-
-    def check_power_input(self, data: pd.DataFrame):
-        # Checks the input field for the process power. If it's a dictionary it leaves it as it is, if it's a string it tries to read the file
-        if isinstance(self.power, str):
-            self.power = {}
-            for layer in self.layers:
-                self.power[layer] = data.loc[:, (self.name, layer)].to_dict()
-        elif isinstance(self.power, dict):  # If the value is a dictionary, we keep it as it is
-            pass
+                    if isinstance(self.info['Power'][id], float|int):
+                        self.power[layer] = self.info['Power'][id]
+                    elif self.info['Power'][id] == 'file':
+                        self.power[layer] = self.ts_data.loc[:, (self.name, layer)].to_dict()
+                        self.has_time_dependent_power = True
+                    else:
+                        raise ValueError(f'The power input for unit {self.name} should be a list of either single values or the string "file"')
         else:
-            return TypeError(f'The input provided for entity {self.name} is {self.power} and \
-                         it appears not valid. Please check it! It should be either \
-                         a list of values, or a string')
-        for layer in self.layers:
-            if any([isinstance(self.power[layer], float), isinstance(self.power[layer], int)]):
-                pass  # If it's a float or an integer, don't do anything
-            elif isinstance(self.power[layer], dict):
-                self.time_dependent_power_profile = True
+            raise ValueError(f'The unit {self.name} has more than one layer, so the power input must be a list')
                 
 
 
@@ -147,19 +133,18 @@ class Utility(Unit):
     lifetime: int | list
     specific_annualized_capex: float
     specific_opex: float
+    max_power: dict
+    has_time_dependent_max_power: bool
     
-    def __init__(self, name, info):
-        super().__init__(name, info)
-        # Assigning values to class-specific attributes
+    def __init__(self, name, info, problem):
+        super().__init__(name, info, problem)
+        self.has_time_dependent_max_power = False
         self.check_default_values('Utility')
         self.specific_capex = self.info['Specific CAPEX']
         self.specific_opex = self.info['Specific OPEX']
         self.lifetime = self.info['Lifetime']
-
-    @staticmethod
-    def calculate_annualization_factor(lifetime, interest_rate):
-        # Calculates the annualization factor
-        return ((interest_rate + 1)**lifetime - 1) / (interest_rate * (1 + interest_rate)**lifetime)
+        self.max_power = {l: 0 for l in self.layers}
+        self.calculate_annualized_capex(self.problem.interest_rate)
 
     def calculate_annualized_capex(self, interest_rate):
         # Calculates the annualized capital cost (specific) for each unit
@@ -169,69 +154,65 @@ class Utility(Unit):
         else:
             self.specific_annualized_capex = self.specific_capex / Utility.calculate_annualization_factor(self.lifetime, interest_rate)
 
+    @staticmethod
+    def calculate_annualization_factor(lifetime, interest_rate):
+        # Calculates the annualization factor
+        return ((interest_rate + 1)**lifetime - 1) / (interest_rate * (1 + interest_rate)**lifetime)
 
 class StandardUtility(Utility):
     # This class does not add anything to a Utility, it is only used for classification purposes
-    max_power: float | int
-    def __init__(self, name, info):
-        super().__init__(name, info)
+    
+    def __init__(self, name, info, interest_rate):
+        super().__init__(name, info, interest_rate)
         # We never really define standard utilities as such. 
-        info['Type'] = 'StandardUtility' if info['Type'] == 'Utility' else info['Type']        
-        self.max_power = self.info['Max power']
+        info['Type'] = 'StandardUtility' if info['Type'] == 'Utility' else info['Type']   
+        self.read_max_power()     
+
+    def read_max_power(self):
+        for id, layer in enumerate(self.layers):
+            if isinstance(self.info['Max power'][id], (int, float)):
+                self.max_power[layer] = self.info['Max power'][id]
+            else:
+                self.has_time_dependent_max_power = True
+                self.max_power[layer] = self.problem.ts_data.loc[:, (self.name, 'Power max', layer)]
 
 class StorageUnit(Utility):
     max_energy: float | int
     c_rate: float
     e_rate: float
     
-    def __init__(self, name, info):
-        super().__init__(name, info)
+    def __init__(self, name, info, problem):
+        super().__init__(name, info, problem)
         self.check_default_values('StorageUnit')     
         # Reading class-speficif values
         self.stored_energy_layer = info['Stored energy layer'] if info['Stored energy layer'] else f'Stored{self.layers[0]}'
+        self.layers.append(self.stored_energy_layer)
         self.max_energy = self.info['Max energy']
         self.c_rate = self.info['C-rate']
         self.e_rate = self.info['E-rate']
 
-    def create_auxiliary_units(self) -> list:
-        # Creates the auxiliary (charging and discharging) units
-        charging_unit_info = self.create_charging_unit_info()
-        discharging_unit_info = self.create_discharging_unit_info()
-        return [Unit.load_unit(charging_unit_info['Name'], charging_unit_info), Unit.load_unit(discharging_unit_info['Name'], discharging_unit_info)]
-
-    def create_charging_unit_info(self) -> dict:
+    @staticmethod
+    def create_auxiliary_unit_info(storage_unit_name, storage_unit_info, aux_type: str) -> dict:
         # Creates the dictionary containing the unit info for the storage charging unit
-        info = self.info['Charging unit info']
+        aux_unit_info = storage_unit_info[f'{aux_type} unit info']
+        stored_energy_layer = storage_unit_info['Stored energy layer'] if 'Stored energy layer' in storage_unit_info.keys() else f'Stored{storage_unit_info['Layers']}'
         output = {}
-        output['Name'] = info['Name'] if 'Name' in info.keys() else f'{self.name}Charger'
-        output['Layers'] = [self.stored_energy_layer] + self.layers
-        if 'Energy requirement layer' in info.keys():
-            output['Energy requirement layer'] = info['Energy requirement layer']
-            output['Layers'].append(info['Energy requirement layer'])
-        output['Main layer'] = info['Main layer'] if 'Main layer' in info.keys() else self.stored_energy_layer
-        output['Type'] = 'ChargingUnit'
-        output['Specific CAPEX'] = info['Specific CAPEX'] if 'Specific CAPEX' in info.keys() else None
-        output['Lifetime'] = info['Lifetime'] if 'Lifetime' in info.keys() else None
-        output['Efficiency'] = info['Efficiency'] if 'Efficiency' in info.keys() else None
-        output['Max charging power'] = self.max_energy * self.c_rate
-        output['Storage unit'] = self.name
-        return output
-
-    def create_discharging_unit_info(self) -> dict:
-        # Creates the dictionary containing the unit info for the storage charging unit
-        info = self.info['Discharging unit info']
-        output = {}
-        output['Name'] = info['Name'] if 'Name' in info.keys() else f'{self.name}Discharger'
-        output['Layers'] = [self.stored_energy_layer] + self.layers
-        if 'Energy requirement layer' in info.keys():
-            output['Layers'].append(info['Energy requirement layer'])
-        output['Main layer'] = info['Main layer'] if 'Main layer' in info.keys() else self.stored_energy_layer
-        output['Type'] = 'DischargingUnit'
-        output['Specific CAPEX'] = info['Specific CAPEX'] if 'Specific CAPEX' in info.keys() else None
-        output['Lifetime'] = info['Lifetime'] if 'Lifetime' in info.keys() else None
-        output['Efficiency'] = info['Efficiency'] if 'Efficiency' in info.keys() else None
-        output['Max discharging power'] = self.max_energy * self.e_rate
-        output['Storage unit'] = self.name
+        output['Name'] = aux_unit_info['Name'] if 'Name' in aux_unit_info.keys() else f'{storage_unit_name}{aux_type.replace('ing','er')}'
+        output['Layers'] = [stored_energy_layer] + [storage_unit_info['Layers']]
+        if 'Energy requirement layer' in aux_unit_info.keys():
+            output['Energy requirement layer'] = aux_unit_info['Energy requirement layer']
+            output['Layers'].append(aux_unit_info['Energy requirement layer'])
+        output['Main layer'] = aux_unit_info['Main layer'] if 'Main layer' in aux_unit_info.keys() else stored_energy_layer
+        output['Type'] = f'{aux_type}Unit'
+        output['Specific CAPEX'] = aux_unit_info['Specific CAPEX'] if 'Specific CAPEX' in aux_unit_info.keys() else None
+        output['Lifetime'] = aux_unit_info['Lifetime'] if 'Lifetime' in aux_unit_info.keys() else None
+        output['Efficiency'] = aux_unit_info['Efficiency'] if 'Efficiency' in aux_unit_info.keys() else None
+        match aux_type:
+            case 'Charging':
+                output[f'Max charging power'] = storage_unit_info['Max energy'] * storage_unit_info['C-rate']
+            case 'Discharging':
+                output[f'Max discharging power'] = storage_unit_info['Max energy'] * storage_unit_info['E-rate']
+        output['Storage unit'] = storage_unit_name
         return output
 
 
@@ -239,8 +220,8 @@ class ChargingUnit(Utility):
     efficiency: float 
     max_charging_power: float
     
-    def __init__(self, name, info):
-        super().__init__(name, info)
+    def __init__(self, name, info, problem):
+        super().__init__(name, info, problem)
         # Defining class-specific attributes
         self.storage_unit = info['Storage unit']
         # Checking default values
@@ -248,17 +229,23 @@ class ChargingUnit(Utility):
         # Assigning values
         self.max_charging_power = self.info['Max charging power']
         self.efficiency = self.info['Efficiency']
-        if 'Energy requirement layer' in info.keys():
-            self.max_power = {key: value for key in self.layers for value in [self.max_charging_power, -self.max_charging_power, -self.max_charging_power * (1 - self.efficiency)]}
+        if info['Energy requirement layer']:
+            self.layers.append(info['Energy requirement layer'])
+            self.max_power = {
+                self.layers[0]: self.max_charging_power,
+                self.layers[1]: -self.max_charging_power,
+                self.layers[2]: -self.max_charging_power * (1-self.efficiency)}
         else:
-            self.max_power = {key: value for key in self.layers for value in [self.max_charging_power * self.efficiency, -self.max_charging_power]}
+            self.max_power = {
+                self.layers[0]: self.max_charging_power * self.efficiency,
+                self.layers[1]: -self.max_charging_power}
 
 class DischargingUnit(Utility):
     efficiency: float
     max_discharging_power: float
     
-    def __init__(self, name, info):
-        super().__init__(name, info)
+    def __init__(self, name, info, interest_rate):
+        super().__init__(name, info, interest_rate)
         # Defining class-specific attributes
         self.storage_unit = info['Storage unit']
         # Checking default values
@@ -266,23 +253,31 @@ class DischargingUnit(Utility):
         # Assigning values
         self.max_discharging_power = self.info['Max discharging power']
         self.efficiency = self.info['Efficiency']
-        if 'Energy requirement layer' in info.keys():
-            self.max_power = {key: value for key in self.layers for value in [-self.max_discharging_power, self.max_discharging_power, -self.max_discharging_power * (1 - self.efficiency)]}
+        if info['Energy requirement layer']:
+            self.layers.append(info['Energy requirement layer'])
+            self.max_power = {
+                self.layers[0]: self.max_discharging_power,
+                self.layers[1]: -self.max_discharging_power,
+                self.layers[2]: -self.max_discharging_power * (1-self.efficiency)}
         else:
-            self.max_power = {key: value for key in self.layers for value in [-self.max_discharging_power, self.max_discharging_power * self.efficiency]}
+            self.max_power = {
+                self.layers[0]: self.max_discharging_power * self.efficiency,
+                self.layers[1]: -self.max_discharging_power}
 
 
 
-class Market(Utility):
+class Market(StandardUtility):
     energy_price: dict
     activation_frequency: dict
+    energy_price_variation: dict | None
+    has_time_dependent_energy_prices: bool
     
-    def __init__(self, name, info):
-        super().__init__(name, info)
-        self.energy_price = {}
+    def __init__(self, name, info, problem):
+        super().__init__(name, info, problem)
+        self.energy_price = {layer: 0.0 for layer in self.layers}
+        self.energy_price_variation = {layer: None for layer in self.layers}
         self.activation_frequency = safe_to_list(info['Activation frequency'])
-        
-    def read_energy_prices(self, data: pd.DataFrame):
+        self.has_time_dependent_energy_prices = False
         # We assume the following possible scenarios:
         # 1. Prices are not time-dependent: in this case, we read the value provided as the constant value
         # 2. Prices are time-dependent, and they are provided by the user
@@ -291,16 +286,15 @@ class Market(Utility):
             for id, layer in enumerate(self.layers):
                 self.energy_price[layer] = safe_to_list(self.info['Price'])[id]
         else:
-            self.energy_price_variation = {}
+            self.has_time_dependent_energy_prices = True
             if 'Price' not in self.info.keys():
                 for id, layer in enumerate(self.layers):
-                    self.energy_price[layer] = data.loc[:, ('Market', layer)].mean().to_dict()
-                    self.energy_price_variation[layer] = (data.loc[:, ('Market', layer)]/self.energy_price[layer]).to_dict()
+                    self.energy_price[layer] = self.ts_data.loc[:, ('Market', layer)].mean().to_dict()
+                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)]/self.energy_price[layer]).to_dict()
             else:
                 for id, layer in enumerate(self.layers):
                     self.energy_price[layer] = safe_to_list(self.info['Price'])[id]
-                    self.energy_price_variation[layer] = (data.loc[:, ('Market', layer)]).to_dict()
-
+                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)]).to_dict()
 
     def check_data_consistency(self):
         assert len(self.layers) == len(self.activation_frequency)
