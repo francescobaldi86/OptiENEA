@@ -105,7 +105,7 @@ class Process(Unit):
                 else:
                     raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
             elif self.info['Power'] == 'file':
-                self.power[self.layers[0]] = self.ts_data.loc[:, ('Power', self.layers[0])].to_dict()
+                self.power[self.layers[0]] = self.ts_data.loc[:, ('Power', self.layers[0])]
                 self.has_time_dependent_power = True
             else:
                 raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
@@ -115,7 +115,7 @@ class Process(Unit):
                     if isinstance(self.info['Power'][id], float|int):
                         self.power[layer] = self.info['Power'][id]
                     elif self.info['Power'][id] == 'file':
-                        self.power[layer] = self.ts_data.loc[:, (self.name, layer)].to_dict()
+                        self.power[layer] = self.ts_data.loc[:, (self.name, layer)]
                         self.has_time_dependent_power = True
                     else:
                         raise ValueError(f'The power input for unit {self.name} should be a list of either single values or the string "file"')
@@ -289,12 +289,12 @@ class Market(StandardUtility):
             self.has_time_dependent_energy_prices = True
             if 'Price' not in self.info.keys():
                 for id, layer in enumerate(self.layers):
-                    self.energy_price[layer] = self.ts_data.loc[:, ('Market', layer)].mean().to_dict()
-                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)]/self.energy_price[layer]).to_dict()
+                    self.energy_price[layer] = self.ts_data.loc[:, ('Market', layer)].mean()
+                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)]/self.energy_price[layer])
             else:
                 for id, layer in enumerate(self.layers):
                     self.energy_price[layer] = safe_to_list(self.info['Price'])[id]
-                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)]).to_dict()
+                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)])
 
     def check_data_consistency(self):
         assert len(self.layers) == len(self.activation_frequency)

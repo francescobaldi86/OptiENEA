@@ -72,9 +72,9 @@ def test_read_units_data(problem_with_unit_data):
     assert isinstance(units['WindFarm'], Process)
     assert isinstance(units['Market'], Market) 
     assert units['Battery'].c_rate == 1.0
-    assert len(units['WindFarm'].power) == 1  # Only one layer
-    assert len(units['WindFarm'].power['Electricity']) == 1  # Only one typical day
-    assert len(units['WindFarm'].power['Electricity']['0']) == 8760  # Only one typical day
+    assert isinstance(units['WindFarm'].power, dict)  # Only one layer
+    assert isinstance(units['WindFarm'].power['Electricity'], pd.Series)
+    assert len(units['WindFarm'].power['Electricity']) == 8760  # Only one typical day
 
 def test_parse_sets(problem_with_unit_data):
     # Tests the "process_problem_data" function
@@ -88,11 +88,10 @@ def test_parse_sets(problem_with_unit_data):
 def test_parse_parameters(problem_with_unit_data):
     # Tests the "process_problem_data" function
     problem_with_unit_data.parse_parameters()
-    assert len(problem_with_unit_data.parameters['POWER']) == 1
-    assert problem_with_unit_data.parameters['POWER']['WindFarm']['Electricity'][0][3] == 43.688
+    assert problem_with_unit_data.parameters['POWER']().loc[('WindFarm','Electricity', 3), 'POWER'] == 43.688
     assert problem_with_unit_data.ampl_parameters['OCCURRENCE'][0] == 1
-    assert problem_with_unit_data.parameters['CRATE']['Battery'] == 1.0
-    assert problem_with_unit_data.parameters['ENERGY_PRICE']['Electricity'] == 0.0478
+    assert problem_with_unit_data.parameters['CRATE']().loc['Battery', 'CRATE'] == 1.0
+    assert problem_with_unit_data.parameters['ENERGY_AVERAGE_PRICE']().loc[('Market', 'Electricity'), 'ENERGY_AVERAGE_PRICE'] == 0.0478
 
 def test_create_ampl_problem(problem_with_all_data):
     problem_with_all_data.create_ampl_model()
@@ -112,6 +111,7 @@ def problem_base():
 
     problem = Problem(name = 'test_problem', 
                       problem_folder = problem_folder)
+    problem.create_folders()
     # Problem setup this way is what we want to give to tests
     yield problem
     # Then we clean up

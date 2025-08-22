@@ -13,6 +13,7 @@ from pathlib import Path
 from OptiENEA.classes.unit import *
 from OptiENEA.classes.set import Set
 from OptiENEA.classes.objective_function import ObjectiveFunction
+from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplProblem
 from OptiENEA.helpers.helpers import read_data_file, validate_project_structure, safe_to_list, dict_tree, to_dict
@@ -48,7 +49,7 @@ class Problem:
             self.temp_folder = temp_folder
             self.units = {}
             self.sets = Set.create_empty_sets()
-            self.parameters = dict_tree()
+            self.parameters = Parameter.create_empty_parameters()
             self.layers = set()
             self.ampl_problem = AmplProblem(self)
             self.number_of_typical_days: int
@@ -101,7 +102,7 @@ class Problem:
                   self.raw_general_data = yaml.safe_load(stream)
             self.raw_timeseries_data = pd.read_csv(
                   os.path.join(self.problem_folder, 'Input', 'timeseries_data.csv'), 
-                  header = [0,1,2,3], 
+                  header = [0,1,2], 
                   index_col = 0, 
                   sep = ";")
      
@@ -117,6 +118,7 @@ class Problem:
             # Checking if problem has typical days
             self.has_typical_days = True if len(self.ampl_parameters["OCCURRENCE"]) == 1 else False
             self.number_of_typical_days = len(self.ampl_parameters["OCCURRENCE"])
+            self.objective = ObjectiveFunction(self.raw_general_data['Settings']['Objective'])
       
 
       def read_units_data(self):
@@ -180,44 +182,62 @@ class Problem:
             for unit_name, unit in self.units.items():
                   if isinstance(unit, Process):
                         for layer in unit.layers:
-                              if isinstance(unit.power[layer], dict):
-                                    for td in range(self.number_of_typical_days):
-                                          for ts in range(len(unit.power[layer][str(td)])):
-                                                self.parameters['POWER'][unit_name][layer][td][ts] = unit.power[layer][str(td)][ts]
+                              if isinstance(unit.power[layer], pd.Series):
+                                    temp = pd.DataFrame(index = unit.power[layer].index, columns = self.parameters['POWER'].content.columns)
+                                    temp.loc[:, 'POWER'] = unit.power[layer]
+                                    temp.loc[:, 'processes'] = unit_name
+                                    temp.loc[:, 'layersOfUnit'] = layer
                               else:
-                                    for td in range(self.number_of_typical_days):
-                                          for ts in range(self.simulation_horizon):
-                                                self.parameters['POWER'][unit_name][layer][td][ts] = unit.power[layer]
+                                    temp = pd.DataFrame(index = [x for x in range(self.simulation_horizon)], columns = self.parameters['POWER'].content.columns)
+                                    temp.loc[:, 'POWER'] = unit.power[layer]
+                                    temp.loc[:, 'processes'] = unit_name
+                                    temp.loc[:, 'layersOfUnit'] = layer
+                              temp.loc[:, 'timeSteps'] = temp.index
+                              self.parameters['POWER'].list_content.append(temp)
                   elif isinstance(unit, Utility):
-                        self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'][unit_name] = unit.specific_annualized_capex
+                        self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
                         if isinstance(unit, StandardUtility):
                               for layer in unit.layers:
-                                    if isinstance(unit.max_power[layer], dict):
-                                          self.parameters['POWER_MAX'][unit_name][layer] = max(unit.max_power[layer])
-                                          self.parameters['POWER_MAX_REL'][unit_name][layer] = [x / self.POWER_MAX[unit_name][layer] for x in unit.max_power[layer]]
+                                    if isinstance(unit.max_power[layer], pd.Series):
+                                          self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': max(unit.max_power[layer])})
+                                          temp = pd.DataFrame(index = unit.max_power[layer].index, columns = self.parameters['POWER_MAX_REL'].content.columns)
+                                          temp.loc[:, 'POWER_MAX_REL'] = unit.max_power[layer] / max(unit.max_power[layer])
+                                          temp.loc[:, 'nonStorageUtilities'] = unit_name
+                                          temp.loc[:, 'layersOfUnit'] = layer
+                                          temp.loc[:, 'timeSteps'] = temp.index
+                                          self.parameters['POWER_MAX_REL'].list_content.append(temp)
                                     else:
-                                          self.parameters['POWER_MAX'][unit_name][layer] = unit.max_power[layer]
+                                          self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_power[layer]})
                                     if isinstance(unit, Market):
-                                          self.parameters['ENERGY_PRICE'][layer] = unit.energy_price[layer]
+                                          self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
                                           if unit.energy_price_variation[layer]:
-                                                for td in range(self.number_of_typical_days):
-                                                      for ts in range(len(unit.power[layer])):
-                                                            self.parameters['ENERGY_PRICE_VARIATION'][unit_name][layer][td][ts] = unit.energy_price_variation[layer][str(td)][ts]
+                                                temp = pd.DataFrame(index = unit.energy_price_variation[layer].index, columns = self.parameters['ENERGY_PRICE_VARIATION'].content.columns)
+                                                temp.loc[:, 'ENERGY_PRICE_VARIATION'] = unit.energy_price_variation[layer]
+                                                temp.loc[:, 'nonStorageUtilities'] = unit_name
+                                                temp.loc[:, 'layersOfUnit'] = layer
+                                                temp.loc[:, 'timeSteps'] = temp.index
+                                                self.parameters['ENERGY_PRICE_VARIATION'].list_content.append(temp)
                         elif isinstance(unit, StorageUnit):
-                              self.parameters['ENERGY_MAX'][unit_name] = unit.max_energy
-                              self.parameters['CRATE'][unit_name] = unit.c_rate
-                              self.parameters['ERATE'][unit_name] = unit.e_rate
+                              self.parameters['ENERGY_MAX'].list_content.append({'storageUnits': unit_name, 'ENERGY_MAX': unit.max_energy})
+                              self.parameters['CRATE'].list_content.append({'storageUnits': unit_name, 'CRATE': unit.c_rate})
+                              self.parameters['ERATE'].list_content.append({'storageUnits': unit_name, 'ERATE': unit.e_rate})
                   else:
-                        raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process Utility, or StorageUnit')
-            self.parameters = to_dict(self.parameters)  # Transforms the type from "defaultdict" to "dict", for clarity
+                        raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
+            # Finally doing the conversion from lists to Dataframes
+            for param_name, parameter in self.parameters.items():
+                  if parameter.indexing_level > 0 and parameter.list_content != []:
+                        if param_name in {'ENERGY_PRICE_VARIATION', 'POWER_MAX_REL', 'POWER'}:
+                              parameter.content = pd.concat(parameter.list_content)
+                        else:
+                              parameter.content = pd.DataFrame(parameter.list_content)
+                        parameter.content = parameter.content.set_index([x for x in parameter.content.columns if x != param_name])
 
       
       def create_ampl_model(self):
             # Based on the available information, create the mod file
-            self.ampl_problem.parse_problem_units(self.units)
-            self.ampl_problem.parse_problem_objective(self.objective)
-            self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary folder', f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}')
+            self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary files', f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}')
             os.mkdir(self.ampl_problem.temp_folder)
+            self.ampl_problem.parse_problem_settings()
             self.ampl_problem.write_mod_file()
             self.ampl_problem.write_sets_to_amplpy()
             self.ampl_problem.write_parameters_to_amplpy()

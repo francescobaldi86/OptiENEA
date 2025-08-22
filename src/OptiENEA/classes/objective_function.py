@@ -3,15 +3,13 @@ class ObjectiveFunction():
         self.name = name
         match name:
             case "TOTEX":
-                self.objective = "minimize TOTEX;\n"
-                self.constraints = [
-                    "s.t. TOTEX = CAPEX + OPEX;\n"
-                ]
+                self.objective = "minimize obj: TOTEX;\n"
+                self.constraints = []
             case "CAPEX":
-                self.objective = "minimize CAPEX;\n"
+                self.objective = "minimize obj: CAPEX;\n"
                 self.constraints = []
             case "OPEX":
-                self.objective = "minimize CAPEX;\n"
+                self.objective = "minimize obj: OPEX;\n"
                 self.constraints = []
             case _:
                 self.objective = info['objective']
