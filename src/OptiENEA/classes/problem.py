@@ -58,7 +58,6 @@ class Problem:
             # Addiing ampl parameters
             self.interest_rate = 0.06
             self.simulation_horizon = 8760
-            self.ampl_parameters = {"OCCURRENCE": [1], "TIME_STEP_DURATION": [1]}
 
 
       def full_run(self):
@@ -113,11 +112,11 @@ class Problem:
             # Addiing ampl parameters
             self.interest_rate = self.raw_general_data['Standard parameters']['Interest rate']
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
-            self.ampl_parameters["OCCURRENCE"] = safe_to_list(self.raw_general_data['Standard parameters']['Occurrence'])
-            self.ampl_parameters["TIME_STEP_DURATION"] = self.raw_general_data['Standard parameters']['Time step duration']
+            self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
+            self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
             # Checking if problem has typical days
-            self.has_typical_days = True if len(self.ampl_parameters["OCCURRENCE"]) == 1 else False
-            self.number_of_typical_days = len(self.ampl_parameters["OCCURRENCE"])
+            # self.has_typical_days = True if len(self.parameters["OCCURRANCE"]) == 1 else False
+            # self.number_of_typical_days = len(self.parameters["OCCURRANCE"])
             self.objective = ObjectiveFunction(self.raw_general_data['Settings']['Objective'])
       
 
@@ -159,23 +158,27 @@ class Problem:
 
       def parse_sets(self):
             # NOTE: The append method is a method of the class "Set"
-            self.sets['timeSteps'].content.update([int(x) for x in range(0, self.simulation_horizon, self.ampl_parameters['TIME_STEP_DURATION'])])
+            self.sets['timeSteps'].content.update([int(x) for x in range(0, self.simulation_horizon, self.parameters['TIME_STEP_DURATION']())])
             for layer in self.layers:
                   self.sets['layers'].append(layer.name)
-            for _, unit in self.units.items():
+            for unit_name, unit in self.units.items():
                   for layer in unit.layers:
-                        self.sets['layersOfUnit'].append(layer, unit.name)
-                  self.sets['mainLayerOfUnit'].append(unit.main_layer, unit.name)
+                        self.sets['layersOfUnit'].append(layer, unit_name)
+                  self.sets['mainLayerOfUnit'].append(unit.main_layer, unit_name)
                   if isinstance(unit, Process):
-                        self.sets['processes'].append(unit.name)
+                        self.sets['processes'].append(unit_name)
                   if isinstance(unit, StandardUtility):
-                        self.sets['standardUtilities'].append(unit.name)
+                        self.sets['standardUtilities'].append(unit_name)
                   if isinstance(unit, StorageUnit):
-                        self.sets['storageUnits'].append(unit.name)
+                        self.sets['storageUnits'].append(unit_name)
                   if isinstance(unit, ChargingUnit):
-                        self.sets['chargingUtilitiesOfStorageUnit'].append(unit.name, unit.storage_unit)
+                        self.sets['chargingUtilitiesOfStorageUnit'].append(unit_name, unit.storage_unit)
+                        self.sets['standardUtilities'].append(unit_name)
                   if isinstance(unit, DischargingUnit):
-                        self.sets['dischargingUtilitiesOfStorageUnit'].append(unit.name, unit.storage_unit)
+                        self.sets['dischargingUtilitiesOfStorageUnit'].append(unit_name, unit.storage_unit)
+                        self.sets['standardUtilities'].append(unit_name)
+                  if isinstance(unit, Market):
+                        self.sets['markets'].append(unit_name)
 
       def parse_parameters(self):
         # Parses data for the parameters

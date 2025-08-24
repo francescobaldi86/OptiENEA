@@ -17,7 +17,7 @@ def test_create_empty_problem():
     assert isinstance(problem.sets, dict)
     assert isinstance(problem.sets['timeSteps'], Set)
     assert isinstance(problem.parameters, dict)
-    assert isinstance(problem.parameters['POWER'], defaultdict)
+    assert isinstance(problem.parameters['POWER'], Parameter)
     assert isinstance(problem.ampl_problem, AmplProblem)
 
 
@@ -59,8 +59,8 @@ def test_read_problem_parameters(problem_with_general_parameters):
     assert problem.solver == 'highs'
     assert problem.interest_rate == 0.07
     assert problem.simulation_horizon == 8760
-    assert problem.ampl_parameters["OCCURRENCE"] == [1]
-    assert problem.ampl_parameters["TIME_STEP_DURATION"] == 1
+    assert problem.parameters["OCCURRANCE"].content == 1
+    assert problem.parameters["TIME_STEP_DURATION"].content == 1
 
 
 def test_read_units_data(problem_with_unit_data):
@@ -89,13 +89,17 @@ def test_parse_parameters(problem_with_unit_data):
     # Tests the "process_problem_data" function
     problem_with_unit_data.parse_parameters()
     assert problem_with_unit_data.parameters['POWER']().loc[('WindFarm','Electricity', 3), 'POWER'] == 43.688
-    assert problem_with_unit_data.ampl_parameters['OCCURRENCE'][0] == 1
+    assert problem_with_unit_data.parameters['OCCURRANCE']() == 1
     assert problem_with_unit_data.parameters['CRATE']().loc['Battery', 'CRATE'] == 1.0
     assert problem_with_unit_data.parameters['ENERGY_AVERAGE_PRICE']().loc[('Market', 'Electricity'), 'ENERGY_AVERAGE_PRICE'] == 0.0478
 
 def test_create_ampl_problem(problem_with_all_data):
     problem_with_all_data.create_ampl_model()
     assert True
+
+def test_solve_ampl_problem(problem_with_all_data):
+    problem_with_all_data.create_ampl_model()
+    problem_with_all_data.solve_ampl_problem()
 
 
 
