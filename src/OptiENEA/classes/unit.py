@@ -1,5 +1,5 @@
 from OptiENEA.classes.layer import Layer
-from OptiENEA.helpers.helpers import read_data_file, attribute_name_converter, safe_to_list
+from OptiENEA.helpers.helpers import safe_to_list
 import pandas as pd
 import os
 import yaml
@@ -145,6 +145,7 @@ class Utility(Unit):
         self.lifetime = self.info['Lifetime']
         self.max_power = {l: 0 for l in self.layers}
         self.calculate_annualized_capex(self.problem.interest_rate)
+        self.read_max_power()
 
     def calculate_annualized_capex(self, interest_rate):
         # Calculates the annualized capital cost (specific) for each unit
@@ -153,6 +154,15 @@ class Utility(Unit):
             self.specific_annualized_capex = sum([self.specific_capex[i] / Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) for i in range(len(self.lifetime))])
         else:
             self.specific_annualized_capex = self.specific_capex / Utility.calculate_annualization_factor(self.lifetime, interest_rate)
+    
+    def read_max_power(self):
+        if self.info['Type'] not in {'StorageUnit', 'ChargingUnit', 'DischargingUnit'}:
+            for id, layer in enumerate(self.layers):
+                if isinstance(self.info['Max power'][id], (int, float)):
+                    self.max_power[layer] = self.info['Max power'][id]
+                else:
+                    self.has_time_dependent_max_power = True
+                    self.max_power[layer] = self.problem.ts_data.loc[:, (self.name, 'Power max', layer)]
 
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
@@ -166,15 +176,7 @@ class StandardUtility(Utility):
         super().__init__(name, info, interest_rate)
         # We never really define standard utilities as such. 
         info['Type'] = 'StandardUtility' if info['Type'] == 'Utility' else info['Type']   
-        self.read_max_power()     
 
-    def read_max_power(self):
-        for id, layer in enumerate(self.layers):
-            if isinstance(self.info['Max power'][id], (int, float)):
-                self.max_power[layer] = self.info['Max power'][id]
-            else:
-                self.has_time_dependent_max_power = True
-                self.max_power[layer] = self.problem.ts_data.loc[:, (self.name, 'Power max', layer)]
 
 class StorageUnit(Utility):
     max_energy: float | int
@@ -266,7 +268,7 @@ class DischargingUnit(Utility):
 
 
 
-class Market(StandardUtility):
+class Market(Utility):
     energy_price: dict
     activation_frequency: dict
     energy_price_variation: dict | None

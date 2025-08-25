@@ -1,9 +1,7 @@
 from OptiENEA.classes.unit import Utility, Process, StorageUnit, Market, StandardUtility
 from OptiENEA.classes.objective_function import ObjectiveFunction
 import pandas as pd
-import amplpy, os, yaml
-from collections import defaultdict
-
+import amplpy
 
 class AmplProblem(amplpy.AMPL):
     has_storage: bool
@@ -131,7 +129,7 @@ class AmplProblem(amplpy.AMPL):
             temp_vars.append("var energyStorageLevel{u in storageUnits, l in layersOfUnit[u], t in timeSteps} >=0;")
             temp_vars.append("var energyStorageLevel0{u in storageUnits, l in layersOfUnit[u]} >=0;")
         if self.has_capex:
-            temp_vars.append("var unitAnnualizedInvestmentCost{u in units} >= 0;")
+            temp_vars.append("var unitAnnualizedInvestmentCost{u in nonmarketUtilities} >= 0;")
             temp_vars.append("var size{u in nonmarketUtilities} >= 0;")
             temp_vars.append("var CAPEX;")
             temp_vars.append("var TOTEX;")
@@ -156,7 +154,7 @@ class AmplProblem(amplpy.AMPL):
         # Constraints to be added depending on whether we are calculating the cost of the investment or not
         if self.has_capex:
             temp_constraints.append("s.t. componentSizing{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps}: size[u] >= ics[u,t] * abs(POWER_MAX[u,l]);")
-            temp_constraints.append("s.t. calculate_capex: CAPEX = sum{u in utilities} unitAnnualizedInvestmentCost[u];")
+            temp_constraints.append("s.t. calculate_capex: CAPEX = sum{u in nonmarketUtilities} unitAnnualizedInvestmentCost[u];")
             temp_constraints.append("s.t. calculate_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];")
             temp_constraints.append("s.t. calculate_totex: TOTEX = CAPEX + OPEX;")
         # Constraints to be added depending on whether energy prices depend on the time step or not
@@ -176,7 +174,7 @@ class AmplProblem(amplpy.AMPL):
         # Constraints to be added depending on whether there are storage units in the problem
         if self.has_storage:
             temp_constraints.append("s.t. storage_balance{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
-            temp_constraints.append("\tenergyStorageLevel[u,l,t] = (if t == 1")
+            temp_constraints.append("\tenergyStorageLevel[u,l,t] = (if t == 0")
             temp_constraints.append("\t\tthen")
             temp_constraints.append("\t\t\tenergyStorageLevel0[u,l] - power[u,l,t]*TIME_STEP_DURATION")
             temp_constraints.append("\t\telse")
@@ -185,7 +183,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. storage_cyclic_constraint{u in storageUnits, l in layersOfUnit[u]}:")
             temp_constraints.append("\tenergyStorageLevel0[u,l] >= (if STORAGE_CYCLIC_ACTIVE == 1")
             temp_constraints.append("\t\tthen")
-            temp_constraints.append("\t\t\tenergyStorageLevel[u,l,card(timeSteps)] ")
+            temp_constraints.append("\t\t\tenergyStorageLevel[u,l,card(timeSteps)-1] ")
             temp_constraints.append("\t\telse")
             temp_constraints.append("\t\t\t0")
             temp_constraints.append("\t);")
@@ -216,8 +214,8 @@ class AmplProblem(amplpy.AMPL):
     def write_parameters_to_amplpy(self):
         # Writes the problem data to amplpy
         for parameter_name, parameter in self.problem.parameters.items():
-            if parameter_name in self.get_parameters():
-                self.param[parameter_name] = parameter.content
+            if not parameter.is_empty(): 
+                self.param[parameter_name] = parameter.content    
 
 
 

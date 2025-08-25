@@ -1,5 +1,4 @@
 import OptiENEA.helpers.helpers as helpers
-from collections import defaultdict
 import os, yaml
 from pandas import DataFrame
 
@@ -19,6 +18,16 @@ class Parameter:
     
     def __call__(self):
         return self.content
+    
+    def is_empty(self):
+        # Checks if the parameter is empty of data
+        if self.indexing_level  == 0:
+            if self.content == 0.0:
+                return True
+            else:
+                return False
+        else:
+            return self.content.empty
     
     @staticmethod
     def create_empty_parameters():

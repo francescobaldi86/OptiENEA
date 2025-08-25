@@ -5,14 +5,17 @@ with open(f'{os.path.dirname(os.path.realpath(__file__))}\\..\\lib\\default_enti
     DEFAULT_ENTITIES = yaml.safe_load(stream)
 
 class Set:
-    def __init__(self, name: str, number_of_indeces: int = 0):
+    name: str
+    indexing: list
+    
+    def __init__(self, name: str, indexing: list | None):
         self.name = name
-        if number_of_indeces == 0:
-            self.content = set()
-        elif number_of_indeces == 1:
+        if indexing:
             self.content = defaultdict(set)
+            self.indexing = indexing
         else:
-            raise(ValueError, f'The value for "number of indeces" of a set should be an integer between 0 and 1. {number_of_indeces} was provided for set {self.name}')
+            self.content = set()
+            self.indexing = []
             
 
     def append(self, value, subset: str | None = None):
@@ -35,7 +38,6 @@ class Set:
         Intializes the full list of problem parameters
         """
         problem_sets = {}
-        for level, sets in DEFAULT_ENTITIES['SETS'].items():
-            for set in sets:
-                problem_sets[set] = Set(set, level)
+        for set_name, indexing in DEFAULT_ENTITIES['SETS'].items():
+            problem_sets[set_name] = Set(set_name, indexing)
         return problem_sets

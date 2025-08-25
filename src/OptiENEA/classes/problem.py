@@ -12,11 +12,12 @@ from datetime import datetime
 from pathlib import Path
 from OptiENEA.classes.unit import *
 from OptiENEA.classes.set import Set
+from OptiENEA.classes.variable import Variable
 from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplProblem
-from OptiENEA.helpers.helpers import read_data_file, validate_project_structure, safe_to_list, dict_tree, to_dict
+from OptiENEA.helpers.helpers import validate_project_structure
 
 class Problem:
       name: str
@@ -73,7 +74,7 @@ class Problem:
             self.set_objective_function()  # Reads and sets the objective function
             self.create_ampl_model()  # Creates the problem mod file
             self.solve_ampl_problem()  # Solves the optimization problem
-            self.read_output()  # Reads the output generated 
+            # self.read_output()  # Reads the output generated
             self.save_output()  # Saves the output into useful and readable data structures
             self.generate_plots()  # Generates required figures
 
@@ -114,6 +115,8 @@ class Problem:
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
             self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
             self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
+            # self.output_variables = [x.strip() for x in self.raw_general_data['Settings']['Output variables'].split(',')]
+            self.output_variables = Variable.load_variables_indexing_data(self.raw_general_data['Settings']['Output variables'])
             # Checking if problem has typical days
             # self.has_typical_days = True if len(self.parameters["OCCURRANCE"]) == 1 else False
             # self.number_of_typical_days = len(self.parameters["OCCURRANCE"])
@@ -199,7 +202,11 @@ class Problem:
                               self.parameters['POWER'].list_content.append(temp)
                   elif isinstance(unit, Utility):
                         self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
-                        if isinstance(unit, StandardUtility):
+                        if isinstance(unit, StorageUnit):
+                              self.parameters['ENERGY_MAX'].list_content.append({'storageUnits': unit_name, 'ENERGY_MAX': unit.max_energy})
+                              self.parameters['CRATE'].list_content.append({'storageUnits': unit_name, 'CRATE': unit.c_rate})
+                              self.parameters['ERATE'].list_content.append({'storageUnits': unit_name, 'ERATE': unit.e_rate})
+                        else:
                               for layer in unit.layers:
                                     if isinstance(unit.max_power[layer], pd.Series):
                                           self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': max(unit.max_power[layer])})
@@ -211,19 +218,15 @@ class Problem:
                                           self.parameters['POWER_MAX_REL'].list_content.append(temp)
                                     else:
                                           self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_power[layer]})
-                                    if isinstance(unit, Market):
-                                          self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
-                                          if unit.energy_price_variation[layer]:
-                                                temp = pd.DataFrame(index = unit.energy_price_variation[layer].index, columns = self.parameters['ENERGY_PRICE_VARIATION'].content.columns)
-                                                temp.loc[:, 'ENERGY_PRICE_VARIATION'] = unit.energy_price_variation[layer]
-                                                temp.loc[:, 'nonStorageUtilities'] = unit_name
-                                                temp.loc[:, 'layersOfUnit'] = layer
-                                                temp.loc[:, 'timeSteps'] = temp.index
-                                                self.parameters['ENERGY_PRICE_VARIATION'].list_content.append(temp)
-                        elif isinstance(unit, StorageUnit):
-                              self.parameters['ENERGY_MAX'].list_content.append({'storageUnits': unit_name, 'ENERGY_MAX': unit.max_energy})
-                              self.parameters['CRATE'].list_content.append({'storageUnits': unit_name, 'CRATE': unit.c_rate})
-                              self.parameters['ERATE'].list_content.append({'storageUnits': unit_name, 'ERATE': unit.e_rate})
+                              if isinstance(unit, Market):
+                                    self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
+                                    if unit.energy_price_variation[layer]:
+                                          temp = pd.DataFrame(index = unit.energy_price_variation[layer].index, columns = self.parameters['ENERGY_PRICE_VARIATION'].content.columns)
+                                          temp.loc[:, 'ENERGY_PRICE_VARIATION'] = unit.energy_price_variation[layer]
+                                          temp.loc[:, 'nonStorageUtilities'] = unit_name
+                                          temp.loc[:, 'layersOfUnit'] = layer
+                                          temp.loc[:, 'timeSteps'] = temp.index
+                                          self.parameters['ENERGY_PRICE_VARIATION'].list_content.append(temp)
                   else:
                         raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
             # Finally doing the conversion from lists to Dataframes
@@ -252,7 +255,7 @@ class Problem:
             Calls the required routine to solve the ampl problem
             """
             self.ampl_problem.solve(solver = self.solver)
-            print(self.ampl_problem.solve_result())
+            print(self.ampl_problem.solve_result)
 
       def set_objective_function(self):
             # Sets the objective function
@@ -261,6 +264,31 @@ class Problem:
             elif isinstance(self.problem_data.objective, dict):
                   for key, info in self.problem_data.objective.items():
                         self.objective = ObjectiveFunction(key, info)
+
+      def save_output(self):
+            output = {'kpis': [], 'units': pd.DataFrame(), 'timeseries': pd.DataFrame()}
+            for var_name, var_info in self.output_variables.items():
+                  if var_info.indexed_over == None:
+                        output['kpis'].append({'KPI': var_name, 'Value': self.ampl_problem.get_variable(var_name).value()})
+                  elif 'timeSteps' in var_info.indexed_over:
+                        temp = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
+                        temp.columns = [x.strip('.val') for x in temp.columns]
+                        temp = temp.unstack(level=[0, 1])
+                        # output['timeseries'] = temp.combine_first(output['timeseries'])
+                        output['timeseries'] = pd.concat([output['timeseries'], temp], axis = 1)
+                  elif 'nonmarketUtilities' in var_info.indexed_over:
+                        temp = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
+                        temp.columns = [x.strip('.val') for x in temp.columns]
+                        output['units'] = temp.combine_first(output['units'])
+                  else:
+                        output[var_name] = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
+                        output[var_name].columns = [x.strip('.val') for x in output[var_name].columns]
+            output['kpis'] = pd.DataFrame(output['kpis'])
+            with pd.ExcelWriter(os.path.join(self.problem_folder, 'Results', "Results.xlsx"), engine="xlsxwriter") as writer:
+                  for sheet_name, df in output.items():
+                        if not df.empty:
+                              df.to_excel(writer, sheet_name=sheet_name)
+
 
 
 

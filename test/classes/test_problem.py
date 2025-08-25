@@ -3,7 +3,7 @@ from OptiENEA.classes.set import Set
 from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.amplpy import AmplProblem
 from OptiENEA.classes.unit import *
-import os, pytest, shutil
+import os, pytest, shutil, math
 from datetime import datetime
 from collections import defaultdict
 
@@ -95,12 +95,31 @@ def test_parse_parameters(problem_with_unit_data):
 
 def test_create_ampl_problem(problem_with_all_data):
     problem_with_all_data.create_ampl_model()
-    assert True
+    ampl_sets = problem_with_all_data.ampl_problem.get_sets()
+    ampl_parameters = problem_with_all_data.ampl_problem.get_parameters()
+    assert ampl_parameters['OCCURRANCE'].value() == 1
+    ampl_parameters['POWER'][('WindFarm', 'Electricity', 3)] == 43.688
 
 def test_solve_ampl_problem(problem_with_all_data):
     problem_with_all_data.create_ampl_model()
     problem_with_all_data.solve_ampl_problem()
-
+    
+    assert problem_with_all_data.ampl_problem.solve_result == "solved"
+    assert math.isclose(problem_with_all_data.ampl_problem.get_variable('OPEX').value(), -12415, abs_tol = 1)
+    assert math.isclose(problem_with_all_data.ampl_problem.get_variable('CAPEX').value(), 0, abs_tol = 1)
+    assert math.isclose(problem_with_all_data.ampl_problem.get_variable('OPEX').value(),
+                        problem_with_all_data.ampl_problem.get_variable('TOTEX').value(), 
+                        abs_tol = 1)
+    
+def test_write_problem_output(solved_problem):
+    solved_problem.save_output()
+    # Here we check that the file was generated, and that it contains the right sheets
+    for sheet in ['kpis', 'units', 'timeseries']:
+        _ = pd.read_excel(
+            os.path.join(solved_problem.problem_folder, 'Results', 'Results.xlsx'),
+            sheet_name = sheet
+        )
+    assert True
 
 
 @pytest.fixture
@@ -144,3 +163,9 @@ def problem_with_all_data(problem_with_general_parameters):
     problem_with_general_parameters.parse_sets()
     problem_with_general_parameters.parse_parameters()
     return problem_with_general_parameters
+
+@pytest.fixture
+def solved_problem(problem_with_all_data):
+    problem_with_all_data.create_ampl_model()
+    problem_with_all_data.solve_ampl_problem()
+    return problem_with_all_data

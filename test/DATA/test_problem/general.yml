@@ -1,1 +1,1 @@
-Settings:  Problem name: Test problem  Problem type: LP  Interpreter: ampl  Solver: highs  Objective: OPEXStandard parameters:  Interest rate: 0.07  NT: 8760  Occurrance: 1  Time step duration: 1
+Settings:  Problem name: Test problem  Problem type: LP  Interpreter: ampl  Solver: highs  Objective: TOTEX  Output variables: [TOTEX, OPEX, CAPEX, size, unitAnnualizedInvestmentCost, power, energyStorageLevel]Standard parameters:  Interest rate: 0.07  NT: 8760  Occurrance: 1  Time step duration: 1

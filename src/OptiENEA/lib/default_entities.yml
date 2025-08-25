@@ -1,16 +1,18 @@
 SETS:
-  0: 
-    - timeSteps
-    - layers
-    - markets
-    - standardUtilities
-    - processes
+  timeSteps:
+  layers:
+  markets:
+  standardUtilities:
+  processes:
+  storageUnits:
+  layersOfUnit:
+    - units
+  mainLayerOfUnit:
+    - units
+  chargingUtilitiesOfStorageUnit: 
     - storageUnits
-  1: 
-    - layersOfUnit
-    - mainLayerOfUnit
-    - chargingUtilitiesOfStorageUnit
-    - dischargingUtilitiesOfStorageUnit
+  dischargingUtilitiesOfStorageUnit:
+    - storageUnits
 PARAMETERS:
   OCCURRANCE:
   TIME_STEP_DURATION:
@@ -30,15 +32,33 @@ PARAMETERS:
     - markets
     - layersOfUnit
   POWER:
-  - processes
-  - layersOfUnit
-  - timeSteps
+    - processes
+    - layersOfUnit
+    - timeSteps
   ENERGY_PRICE_VARIATION:
-  - markets
-  - layersOfUnit
-  - timeSteps
+    - markets
+    - layersOfUnit
+    - timeSteps
   POWER_MAX_REL:
     - nonStorageUtilities
     - layersOfUnit
     - timeSteps
-
+VARIABLES:
+  CAPEX:
+  OPEX:
+  TOTEX:
+  size:
+    - nonmarketUtilities
+  unitAnnualizedInvestmentCost:
+    - nonmarketUtilities
+  layer_operating_cost:
+    - outputMarketLayers
+  power: 
+    - units
+    - layersOfUnit
+    - timeSteps
+  energyStorageLevel:
+    - storageUnits
+    - layersOfUnit
+    - timeSteps
+  
