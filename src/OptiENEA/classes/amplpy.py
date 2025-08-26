@@ -103,7 +103,7 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
-        temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
+        temp_params.append("param POWER_MAX_REL{u in utilities, t in timeSteps} default 1;")
         if self.has_time_dependent_energy_prices:
             temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
         if self.has_storage:
@@ -113,8 +113,8 @@ class AmplProblem(amplpy.AMPL):
             temp_params.append("param STORAGE_CYCLIC_ACTIVE default 1;")
             idx = temp_params.index("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
-            idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
-            temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit[u], t in timeSteps} default 1;"
+            idy = temp_params.index("param POWER_MAX_REL{u in utilities, t in timeSteps} default 1;")
+            temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, t in timeSteps} default 1;"
         self.mod_string += "\n".join(temp_params) + "\n\n\n"
         
     def write_variables(self):
@@ -150,7 +150,7 @@ class AmplProblem(amplpy.AMPL):
         temp_constraints.append("/* CONSTRAINTS */\n")
         temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
         temp_constraints.append("s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;")
-        temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = POWER[p,l,t];")
+        temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = -POWER[p,l,t];")
         # Constraints to be added depending on whether we are calculating the cost of the investment or not
         if self.has_capex:
             temp_constraints.append("s.t. componentSizing{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps}: size[u] >= ics[u,t] * abs(POWER_MAX[u,l]);")
@@ -165,9 +165,9 @@ class AmplProblem(amplpy.AMPL):
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
         if self.has_time_dependent_max_power > 0:
             temp_constraints.append("s.t. component_load_standard{u in standardUtilities, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];")
-            temp_constraints.append("s.t. component_load_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
+            temp_constraints.append("s.t. component_load_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,t];")
             temp_constraints.append("s.t. market_limits_standard{u in markets, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: POWER_MAX[u,l] <= power[u,l,t] <= 0;")
-            temp_constraints.append("s.t. market_limits_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
+            temp_constraints.append("s.t. market_limits_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,t] <= power[u,l,t] <= 0;")
         else:
             temp_constraints.append("s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];")
             temp_constraints.append("s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] <= power[u,l,t] <= 0;")
@@ -216,60 +216,3 @@ class AmplProblem(amplpy.AMPL):
         for parameter_name, parameter in self.problem.parameters.items():
             if not parameter.is_empty(): 
                 self.param[parameter_name] = parameter.content    
-
-
-
-
-"""
-class AmplDat():
-    # Class used to handle data for ampl problem
-    def __init__(self, ampl_problem: amplpy.AMPL, mod: AmplMod):
-        # Initialize general data
-        self.ampl: amplpy.AMPL = ampl_problem
-        self.mod: AmplMod = mod
-        self.general_parameters: list = []
-        self.sets = {}
-        # Initialize sets
-        for set_name in PROBLEM_SETS['BASE_SETS']:
-            self.sets[set_name] = Set(set_name)
-        for set_name, indexed_over in PROBLEM_SETS['INDEXED_SETS']:
-            self.sets[set_name] = Set(set_name, indexed_over)
-        # Initialize parameters
-        self.POWER_MAX = {}
-        self.POWER = {}
-        self.TIME_STEP_DURATION = None
-        self.OCCURRANCE = None
-        self.SPECIFIC_INVESTMENT_COST_ANNUALIZED = {}
-        self.ENERGY_PRICE = {}
-        if len(self.mod.units_with_time_dependent_maximum_power) > 0:
-            self.POWER_MAX_REL = {}
-        if len(self.mod.layers_with_time_dependent_price) > 0:
-            self.ENERGY_PRICE_VARIATION = {}
-        if self.mod.has_storage:
-            self.ENERGY_MAX, self.CRATE, self.ERATE = {}, {}, {}
-            self.STORAGE_CYCLIC_ACTIVE = None
-
-
-    def write_parameters_to_amplpy(self):
-        # Writes the problem data to amplpy
-        for param_name in self.general_parameters:
-            self.ampl.param[param_name] = self.getattr(param_name)
-        # Writing power from processes
-        for process in self.processes:
-            self.ampl.param['POWER'] = self.POWER[process]
-        # Writing specific investment cost data
-        self.ampl.param['SPECIFIC_INVESTMENT_COST_ANNUALIZED'] = self.SPECIFIC_INVESTMENT_COST_ANNUALIZED
-        # Writing power max for utilities
-        for utility in self.standardUtilities:
-            self.ampl.param['POWER_MAX'][utility] = self.POWER_MAX[utility]
-            if utility in self.mod.units_with_time_dependent_maximum_power:
-                self.ampl.param['POWER_MAX_REL'][utility] = self.POWER_MAX_REL[utility]
-        # Writing market parameters data
-        self.ampl.param['ENERGY_PRICE'] = self.ENERGY_PRICE
-        if len(self.mod.layers_with_time_dependent_price) > 0:
-            self.ampl.param['ENERGY_PRICE_VARIATION'] = self.ENERGY_PRICE_VARIATION
-        if len(self.storageUnits) > 0:
-            self.ampl.param['ENERGY_MAX'] = self.ENERGY_MAX
-            self.ampl.param['CRATE'] = self.CRATE
-            self.ampl.param['ERATE'] = self.ERATE
-"""

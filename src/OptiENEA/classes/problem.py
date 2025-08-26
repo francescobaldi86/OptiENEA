@@ -61,7 +61,7 @@ class Problem:
             self.simulation_horizon = 8760
 
 
-      def full_run(self):
+      def run(self):
             """
             Class method that simply runs the model as a whole. Useful once everything is set up to run things quickly
             """
@@ -76,7 +76,7 @@ class Problem:
             self.solve_ampl_problem()  # Solves the optimization problem
             # self.read_output()  # Reads the output generated
             self.save_output()  # Saves the output into useful and readable data structures
-            self.generate_plots()  # Generates required figures
+            # self.generate_plots()  # Generates required figures
 
 
       def create_folders(self):
@@ -145,13 +145,13 @@ class Problem:
       
       def load_unit(self, name: str, info: dict):
             match info['Type']:
-                  case 'Process':
+                  case 'Process' | 'Process (producer)' | 'Process (demand)':
                         return Process(name, info, self)
                   case 'Utility':
                         return StandardUtility(name, info, self)
                   case 'StorageUnit':
                         return StorageUnit(name, info, self)
-                  case 'Market':
+                  case 'Market' | 'SellingMarket' | 'PurchaseMarket':
                         return Market(name, info, self)
                   case 'ChargingUnit': 
                         return ChargingUnit(name, info, self)
@@ -208,16 +208,14 @@ class Problem:
                               self.parameters['ERATE'].list_content.append({'storageUnits': unit_name, 'ERATE': unit.e_rate})
                         else:
                               for layer in unit.layers:
-                                    if isinstance(unit.max_power[layer], pd.Series):
-                                          self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': max(unit.max_power[layer])})
+                                    self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_power[layer]})
+                                    if unit.time_dependent_capacity_factor:
                                           temp = pd.DataFrame(index = unit.max_power[layer].index, columns = self.parameters['POWER_MAX_REL'].content.columns)
-                                          temp.loc[:, 'POWER_MAX_REL'] = unit.max_power[layer] / max(unit.max_power[layer])
+                                          temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor
                                           temp.loc[:, 'nonStorageUtilities'] = unit_name
                                           temp.loc[:, 'layersOfUnit'] = layer
                                           temp.loc[:, 'timeSteps'] = temp.index
                                           self.parameters['POWER_MAX_REL'].list_content.append(temp)
-                                    else:
-                                          self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_power[layer]})
                               if isinstance(unit, Market):
                                     self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
                                     if unit.energy_price_variation[layer]:

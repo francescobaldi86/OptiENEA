@@ -10,9 +10,7 @@ Utility:
   Specific CAPEX: 0.01
   Lifetime: 25
   Specific OPEX: 0.0
-
-StandardUtility:
-  Max power:
+  Max installed power:
 
 StorageUnit:
   Max energy: 10000000
@@ -34,3 +32,4 @@ DischargingUnit:
 
 Market:
   Energy price: 0.0
+  Subtype: Purchase

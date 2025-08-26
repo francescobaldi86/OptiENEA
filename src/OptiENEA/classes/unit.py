@@ -94,6 +94,9 @@ class Process(Unit):
         self.check_default_values('Process')
         # If the process has only one layer, the input can be a single float
         self.read_power_input()
+        if self.info['Type'] == 'Process (producer)':
+            for layer, power in self.power.items():
+                self.power[layer] = -power
                 
     def read_power_input(self):
         if len(self.layers) == 1:  # One single value is acceptable only if the process only has one layer
@@ -123,7 +126,6 @@ class Process(Unit):
             raise ValueError(f'The unit {self.name} has more than one layer, so the power input must be a list')
                 
 
-
 class Utility(Unit):
     """
     Differently from Processes, utilities are not necessarily installed. They can be,
@@ -133,7 +135,8 @@ class Utility(Unit):
     lifetime: int | list
     specific_annualized_capex: float
     specific_opex: float
-    max_power: dict
+    max_installed_power: dict
+    time_dependent_capacity_factor: pd.Series | None
     has_time_dependent_max_power: bool
     
     def __init__(self, name, info, problem):
@@ -144,8 +147,10 @@ class Utility(Unit):
         self.specific_opex = self.info['Specific OPEX']
         self.lifetime = self.info['Lifetime']
         self.max_power = {l: 0 for l in self.layers}
+        self.time_dependent_capacity_factor = None
         self.calculate_annualized_capex(self.problem.interest_rate)
-        self.read_max_power()
+        self.read_max_installed_power()
+        self.read_time_dependent_capacity_factor()
 
     def calculate_annualized_capex(self, interest_rate):
         # Calculates the annualized capital cost (specific) for each unit
@@ -155,14 +160,23 @@ class Utility(Unit):
         else:
             self.specific_annualized_capex = self.specific_capex / Utility.calculate_annualization_factor(self.lifetime, interest_rate)
     
-    def read_max_power(self):
+    def read_max_installed_power(self):
         if self.info['Type'] not in {'StorageUnit', 'ChargingUnit', 'DischargingUnit'}:
-            for id, layer in enumerate(self.layers):
-                if isinstance(self.info['Max power'][id], (int, float)):
-                    self.max_power[layer] = self.info['Max power'][id]
+            if isinstance(self.info['Max installed power'], float) | isinstance(self.info['Max installed power'], int):
+                if len(self.layers) == 1:
+                    self.max_power[layer] = self.info['Max installed power']
                 else:
-                    self.has_time_dependent_max_power = True
-                    self.max_power[layer] = self.problem.ts_data.loc[:, (self.name, 'Power max', layer)]
+                    raise ValueError(f'The maximum installed power for unit {self.name} should be a list of {len(self.layers)} elements. A single value was provided')
+            else:
+                for id, layer in enumerate(self.layers):
+                    self.max_power[layer] = self.info['Max installed power'][id]
+
+    def read_time_dependent_capacity_factor(self):
+        if self.ts_data:
+            if "Capacity factor" in self.ts_data.columns.levels[0]:
+                self.time_dependent_capacity_factor = self.ts_data.loc[:, ('Capacity factor', '')]
+
+
 
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
@@ -175,7 +189,7 @@ class StandardUtility(Utility):
     def __init__(self, name, info, interest_rate):
         super().__init__(name, info, interest_rate)
         # We never really define standard utilities as such. 
-        info['Type'] = 'StandardUtility' if info['Type'] == 'Utility' else info['Type']   
+        info['Type'] = 'StandardUtility' if info['Type'] == 'Utility' else info['Type']
 
 
 class StorageUnit(Utility):
@@ -276,6 +290,12 @@ class Market(Utility):
     
     def __init__(self, name, info, problem):
         super().__init__(name, info, problem)
+        match info['Type']:
+            case 'PurchaseMarket' | 'Market':
+                pass
+            case 'SellingMarket':
+                for layer_name, max_power in self.max_power.items():
+                    self.max_power[layer_name] = -max_power
         self.energy_price = {layer: 0.0 for layer in self.layers}
         self.energy_price_variation = {layer: None for layer in self.layers}
         self.activation_frequency = safe_to_list(info['Activation frequency'])

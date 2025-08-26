@@ -44,12 +44,12 @@ def test_read_problem_data(problem_with_data):
     assert isinstance(problem.raw_general_data, dict)
     assert isinstance(problem.raw_unit_data, dict)
     assert problem.raw_general_data['Settings']['Problem type'] == 'LP'
-    assert problem.raw_general_data['Settings']['Objective'] == 'OPEX'
+    assert problem.raw_general_data['Settings']['Objective'] == 'TOTEX'
     assert isinstance(problem.raw_general_data['Standard parameters'], dict)
-    assert problem.raw_unit_data['WindFarm']['Type'] == 'Process'
+    assert problem.raw_unit_data['WindFarm']['Type'] == 'Process (producer)'
     assert problem.raw_unit_data['WindFarm']['Power'] == 'file'
-    assert problem.raw_unit_data['Market']['Type'] == 'Market'
-    assert problem.raw_unit_data['Market']['Max power'] == [-10000]
+    assert problem.raw_unit_data['Market']['Type'] == 'SellingMarket'
+    assert problem.raw_unit_data['Market']['Max power'] == [10000]
 
 
 def test_read_problem_parameters(problem_with_general_parameters):
@@ -88,7 +88,7 @@ def test_parse_sets(problem_with_unit_data):
 def test_parse_parameters(problem_with_unit_data):
     # Tests the "process_problem_data" function
     problem_with_unit_data.parse_parameters()
-    assert problem_with_unit_data.parameters['POWER']().loc[('WindFarm','Electricity', 3), 'POWER'] == 43.688
+    assert problem_with_unit_data.parameters['POWER']().loc[('WindFarm','Electricity', 3), 'POWER'] == -43.688
     assert problem_with_unit_data.parameters['OCCURRANCE']() == 1
     assert problem_with_unit_data.parameters['CRATE']().loc['Battery', 'CRATE'] == 1.0
     assert problem_with_unit_data.parameters['ENERGY_AVERAGE_PRICE']().loc[('Market', 'Electricity'), 'ENERGY_AVERAGE_PRICE'] == 0.0478

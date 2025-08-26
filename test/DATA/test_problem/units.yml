@@ -1,14 +1,14 @@
 WindFarm:
-  Type: Process
+  Type: Process (producer)
   Layers: Electricity
   Power: file
 
 Market:
-  Type: Market
+  Type: SellingMarket
   Layers: [Electricity]
   Main layer: Electricity
   Price: [0.0478]  # Units are kEUR/MWh, kEUR/MWh, kEUR/ton
-  Max power: [-10000]
+  Max installed power: [10000]
   Activation frequency: [1]
     
 Battery:
