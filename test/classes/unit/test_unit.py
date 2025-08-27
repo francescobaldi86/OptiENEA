@@ -1,4 +1,5 @@
 from OptiENEA.classes.unit import *
+from OptiENEA.classes.problem import Problem
 import os
 
 TEST_INFO_UNIT = {'Type': 'no type', 'Layers': ['test_layer_1', 'test_layer_2'], 'Main layer': 'test_layer_1'}
@@ -20,53 +21,60 @@ __HERE__ = os.path.dirname(os.path.realpath(__file__))
 
 def test_init_unit():
     # Tests the creation of a generic unit
-    unit = Unit('test_unit', TEST_INFO_UNIT)
+    unit = Unit('test_unit', TEST_INFO_UNIT, Problem(''))
     assert unit.layers == ['test_layer_1', 'test_layer_2']
     assert unit.name == 'test_unit'
     assert unit.main_layer == 'test_layer_1'
+    assert isinstance(unit.problem, Problem)
 
 
-def test_init_process_power_dict():
-    # Tests the creation of a process
-    # First with power specified as a single value
-    process = Process('test_process', TEST_INFO_PROCESS)
-    assert process.name == 'test_process'
-    assert process.power[process.main_layer] == [10]
-    process.check_power_input()
-    assert process.power[process.main_layer] == [10]
+def test_init_process():
+    # Tests the creation of a process, with all possible options for power input
+    # 1 - Single layer, value provided as single value
+    TEST_INFO_PROCESS['Layers'] = 'Electricity'
+    TEST_INFO_PROCESS['Power'] = 10
+    process = Process('TestProcess', TEST_INFO_PROCESS, Problem(''))
+    assert process.name == 'TestProcess'
+    assert process.power['Electricity'] == 10
+    assert process.power[process.main_layer] == 10
+    # 2 - Single layer, values provided as a list
+    TEST_INFO_PROCESS['Layers'] = ['Electricity']
+    TEST_INFO_PROCESS['Power'] = [10]
+    process = Process('TestProcess', TEST_INFO_PROCESS, Problem(''))
+    assert process.power['Electricity'] == 10
+    # 3 - Single layer, values provided as a time series
+    problem = Problem('')
+    problem.raw_timeseries_data = pd.read_csv(os.path.join(__HERE__,"..","DATA","test_unit","data","power_test_process.csv"), sep=";", index_col=0, header=[0,1,2])
+    TEST_INFO_PROCESS['Layers'] = 'Electricity'
+    TEST_INFO_PROCESS['Power'] = "file"
+    process = Process('TestProcess', TEST_INFO_PROCESS, problem)
+    assert process.power['Electricity'].loc[0] == 90.7
+    # 4 - Double layer, two contsant values
+    TEST_INFO_PROCESS['Layers'] = ['Electricity', 'Heat']
+    TEST_INFO_PROCESS['Power'] = [10, 7]
+    process = Process('TestProcess', TEST_INFO_PROCESS, Problem(''))
+    assert process.power['Electricity'] == 10
+    assert process.power['Heat'] == 7
+    # 5 - Double layer, one constant one time series
+    problem = Problem('')
+    problem.raw_timeseries_data = pd.read_csv(os.path.join(__HERE__,"..","DATA","test_unit","data","power_test_process.csv"), sep=";", index_col=0, header=[0,1,2])
+    TEST_INFO_PROCESS['Layers'] = ['Electricity', 'Heat']
+    TEST_INFO_PROCESS['Power'] = [10, 'file']
+    process = Process('TestProcess', TEST_INFO_PROCESS, problem)
+    assert process.power['Electricity'] == 10
+    assert process.power['Heat'].loc[0] == 10.4
+    # 6 - Double layer, both as columns in the ts_data file
+    TEST_INFO_PROCESS['Power'] = ['file', 'file']
+    process = Process('TestProcess', TEST_INFO_PROCESS, problem)
+    assert process.power['Electricity'].loc[0] == 90.7
+    assert process.power['Heat'].loc[0] == 10.4
 
-def test_init_process_power_file_address():
-    # Then we try with a file indication
-    TEST_INFO_PROCESS['Power'] = f'{__HERE__}\\..\\DATA\\test_unit\\data\\power_test_process.csv'
-    process = Process('test_process', TEST_INFO_PROCESS)
-    process.check_power_input()
-    assert isinstance(process.power, pd.DataFrame)
-    assert process.power.loc[5, 'Electricity'] == 60.1
-    assert process.power.loc[15, 'Heat'] == 4.9
 
-def test_init_process_power_file_default():
-    # Next we try reading it providing the project folder
-    TEST_INFO_PROCESS['Power'] = 'file'
-    process = Process('test_process', TEST_INFO_PROCESS)
-    process.check_power_input(problem_folder=f'{__HERE__}\\..\\DATA\\test_unit')
-    assert isinstance(process.power, pd.DataFrame)
-    assert process.power.loc[5, 'Electricity'] == 60.1
-    assert process.power.loc[15, 'Heat'] == 4.9
 
-def test_init_process_power_file_TD():
-    TEST_INFO_PROCESS['Power'] = 'file'
-    process = Process('test_process', TEST_INFO_PROCESS)
-    # Finally, we try reading a case with typical days
-    process.check_power_input(problem_folder=f'{__HERE__}\\..\\DATA\\test_unit', has_typical_days=True)
-    assert isinstance(process.power, dict)
-    assert isinstance(process.power['Electricity'], pd.DataFrame)
-    assert process.power['Electricity'].loc[5, 'TD1'] == 60.1
-    assert process.power['Electricity'].loc[12, 'TD2'] == 122.1
-    assert process.power['Heat'].loc[6, 'TD1'] == 6.1
-    assert process.power['Heat'].loc[18, 'TD2'] == 7.7
 
-def test_init_utility_default():
-    # Tests the creation of a utility with no additional information
+def test_init_utility():
+    # Tests the creation of a utility
+    # 1 - 
     TEST_INFO_UTILITY = {'Type': 'Utility', 'Layers': ['Electricity', 'Heat'], 
                      'Main layer': 'Electricity', 'Max power': [1400, 900]}
     utility = Utility('test_utility', TEST_INFO_UTILITY)

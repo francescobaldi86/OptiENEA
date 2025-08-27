@@ -52,13 +52,15 @@ class Problem:
             self.sets = Set.create_empty_sets()
             self.parameters = Parameter.create_empty_parameters()
             self.layers = set()
-            self.ampl_problem = AmplProblem(self)
             self.number_of_typical_days: int
             self.interpreter = 'ampl'
             self.solver = 'highs'
             # Addiing ampl parameters
             self.interest_rate = 0.06
             self.simulation_horizon = 8760
+            self.raw_timeseries_data = pd.DataFrame()
+            self.raw_general_data = {}
+            self.raw_unit_data = {}
 
 
       def run(self):
@@ -100,11 +102,15 @@ class Problem:
                   self.raw_unit_data = yaml.safe_load(stream)
             with open(os.path.join(self.problem_folder, 'Input','general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
-            self.raw_timeseries_data = pd.read_csv(
-                  os.path.join(self.problem_folder, 'Input', 'timeseries_data.csv'), 
-                  header = [0,1,2], 
-                  index_col = 0, 
-                  sep = ";")
+            try:
+                  self.raw_timeseries_data = pd.read_csv(
+                        os.path.join(self.problem_folder, 'Input', 'timeseries_data.csv'), 
+                        header = [0,1,2], 
+                        index_col = 0, 
+                        sep = ";")
+            except FileNotFoundError:
+                  pass
+                  # Requires logging
      
       def read_problem_parameters(self):
             # Reads the problem's general data into the deidcated structure
@@ -239,6 +245,7 @@ class Problem:
       
       def create_ampl_model(self):
             # Based on the available information, create the mod file
+            self.ampl_problem = AmplProblem(self)
             self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary files', f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}')
             os.mkdir(self.ampl_problem.temp_folder)
             self.ampl_problem.parse_problem_settings()

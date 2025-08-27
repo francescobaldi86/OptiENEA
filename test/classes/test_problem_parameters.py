@@ -1,4 +1,4 @@
-from OptiENEA.classes.parameter import ProblemParameters
+from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.problem import Problem
 import os
 

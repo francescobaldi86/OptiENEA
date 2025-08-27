@@ -1,5 +1,4 @@
-from OptiENEA.classes.unit import Utility, Process, StorageUnit, Market, StandardUtility
-from OptiENEA.classes.objective_function import ObjectiveFunction
+import OptiENEA.classes.unit as ut
 import pandas as pd
 import amplpy
 
@@ -38,18 +37,18 @@ class AmplProblem(amplpy.AMPL):
 
     def parse_problem_settings(self):
         for _, unit in self.problem.units.items():
-            if isinstance(unit, Process):
+            if isinstance(unit, ut.Process):
                 if unit.has_time_dependent_power:
                     self.has_time_dependent_power = True
-            if isinstance(unit, Utility):
+            if isinstance(unit, ut.Utility):
                 if unit.specific_capex >= 1:
                     self.has_capex = True
-                if isinstance(unit, StandardUtility):
+                if isinstance(unit, ut.StandardUtility):
                     if unit.has_time_dependent_max_power:
                         self.has_time_dependent_max_power = True
-                elif isinstance(unit, StorageUnit):
+                elif isinstance(unit, ut.StorageUnit):
                     self.has_storage = True
-                elif isinstance(unit, Market):
+                elif isinstance(unit, ut.Market):
                     if unit.has_time_dependent_energy_prices:
                         self.has_time_dependent_energy_prices = True
                 

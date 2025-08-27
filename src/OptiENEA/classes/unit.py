@@ -18,7 +18,7 @@ class Unit:
     info: dict
     ts_data: pd.DataFrame | None
     
-    def __init__(self, name, info, problem):
+    def __init__(self, name:str, info: dict, problem):
         # Assigning attribute values based on input
         self.name = name
         self.layers = info['Layers'] if isinstance(info['Layers'], list) else [info['Layers']]
@@ -27,8 +27,7 @@ class Unit:
         self.info = info
         self.problem = problem
         self.check_main_layer()
-        self.ts_data = problem.raw_timeseries_data.loc[:, (name)] if name in problem.raw_timeseries_data.columns else None
-    
+        self.ts_data = problem.raw_timeseries_data.loc[:, (name)] if name in problem.raw_timeseries_data.columns else None   
     
     def check_default_values(self, unit_type):
         # Assigns default values for the specific unit type to the related fields
@@ -101,10 +100,10 @@ class Process(Unit):
     def read_power_input(self):
         if len(self.layers) == 1:  # One single value is acceptable only if the process only has one layer
             if isinstance(self.info['Power'], float|int):
-                self.power[self.layers[0]] = [self.info['Power']]
+                self.power[self.layers[0]] = self.info['Power']
             elif isinstance(self.info['Power'], list):
                 if len(self.info['Power']) == 1:
-                    self.power[self.layers[0]] = self.info['Power']
+                    self.power[self.layers[0]] = self.info['Power'][0]
                 else:
                     raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
             elif self.info['Power'] == 'file':
@@ -118,7 +117,7 @@ class Process(Unit):
                     if isinstance(self.info['Power'][id], float|int):
                         self.power[layer] = self.info['Power'][id]
                     elif self.info['Power'][id] == 'file':
-                        self.power[layer] = self.ts_data.loc[:, (self.name, layer)]
+                        self.power[layer] = self.ts_data.loc[:, ('Power', layer)]
                         self.has_time_dependent_power = True
                     else:
                         raise ValueError(f'The power input for unit {self.name} should be a list of either single values or the string "file"')

@@ -4,8 +4,6 @@ from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.amplpy import AmplProblem
 from OptiENEA.classes.unit import *
 import os, pytest, shutil, math
-from datetime import datetime
-from collections import defaultdict
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
 __PARENT__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
