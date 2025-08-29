@@ -16,13 +16,18 @@ set nonmarketUtilities = utilities diff markets;
 set chargingUtilitiesOfStorageUnit{u in storageUnits}  within utilities;
 set dischargingUtilitiesOfStorageUnit{u in storageUnits}  within utilities;
 set nonStorageUtilities within utilities = utilities diff storageUnits;
+set layersWithTimeDependentPrice within layers;
+set layersWithFixedPrice = layers diff layersWithTimeDependentPrice;
 param POWER_MAX{u in nonStorageUtilities, l in  layersOfUnit[u]}  default 0;
 param POWER{p in processes, l in  layersOfUnit[p], t in timeSteps};
 param TIME_STEP_DURATION;
 param OCCURRANCE;
 param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities}  default 0;
 param ENERGY_AVERAGE_PRICE{m in markets, l in  layersOfUnit[m]}  default 0;
-param POWER_MAX_REL{u in nonStorageUtilities, t in timeSteps}  default 1;
+param POWER_MAX_REL{u in nonStorageUtilities, l in  layersOfUnit[u], t in
+  timeSteps}  default 1;
+param ENERGY_PRICE_VARIATION{m in markets, l in  layersOfUnit[m], t in
+  timeSteps}  default 1;
 param ENERGY_MAX{u in storageUnits}  default 0;
 param CRATE{u in storageUnits}  default 1;
 param ERATE{u in storageUnits}  default 1;
@@ -54,9 +59,10 @@ subject to calculate_investment_cost{u in nonmarketUtilities} :
   unitAnnualizedInvestmentCost[u] == size[u]*
   SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];
 subject to calculate_totex: TOTEX == CAPEX + OPEX;
-subject to calculate_operating_cost_standard{u in markets, l in
+subject to calculate_operating_cost_time_dependent{u in markets, l in
    layersOfUnit[u]} : layer_operating_cost[u,l] == sum{t in timeSteps}
-  power[u,l,t]*ENERGY_AVERAGE_PRICE[u,l]*TIME_STEP_DURATION*OCCURRANCE;
+  power[u,l,t]*ENERGY_AVERAGE_PRICE[u,l]*ENERGY_PRICE_VARIATION[u,l,t]*
+  TIME_STEP_DURATION*OCCURRANCE;
 subject to component_load{u in standardUtilities, l in  layersOfUnit[u],
   t in timeSteps} : power[u,l,t] == ics[u,t]*POWER_MAX[u,l];
 subject to market_limits{u in markets, l in  layersOfUnit[u], t in

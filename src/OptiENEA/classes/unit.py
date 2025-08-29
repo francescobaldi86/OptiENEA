@@ -212,7 +212,7 @@ class StorageUnit(Utility):
         self.check_default_values('StorageUnit')     
         # Reading class-speficif values
         self.exchange_energy_layer = self.layers[0]
-        self.stored_energy_layer = info['Stored energy layer'] if info['Stored energy layer'] else f'Stored{self.layers[0]}'
+        self.stored_energy_layer = StorageUnit.storage_layer_name(info)
         self.layers.append(self.stored_energy_layer)
         self.max_energy = self.info['Max energy']
         self.c_rate = self.info['C-rate']
@@ -222,10 +222,13 @@ class StorageUnit(Utility):
     def create_auxiliary_unit_info(storage_unit_name, storage_unit_info, aux_type: str) -> dict:
         # Creates the dictionary containing the unit info for the storage charging unit
         aux_unit_info = storage_unit_info[f'{aux_type} unit info']
-        stored_energy_layer = storage_unit_info['Stored energy layer'] if 'Stored energy layer' in storage_unit_info.keys() else f'Stored{storage_unit_info['Layers']}'
+        stored_energy_layer = StorageUnit.storage_layer_name(storage_unit_info)
         output = {}
         output['Name'] = aux_unit_info['Name'] if 'Name' in aux_unit_info.keys() else f'{storage_unit_name}{aux_type.replace('ing','er')}'
-        output['Layers'] = [l for l in storage_unit_info['Layers']]
+        storage_unit_layers = safe_to_list(storage_unit_info['Layers'])
+        output['Layers'] = [l for l in storage_unit_layers]
+        if stored_energy_layer not in output['Layers']:
+            output['Layers'].append(stored_energy_layer)
         if 'Energy requirement layer' in aux_unit_info.keys():
             output['Energy requirement layer'] = aux_unit_info['Energy requirement layer']
             output['Layers'].append(aux_unit_info['Energy requirement layer'])
@@ -242,6 +245,10 @@ class StorageUnit(Utility):
         output['Storage unit'] = storage_unit_name
         return output
 
+    @staticmethod
+    def storage_layer_name(storage_unit_info):
+        storage_unit_info['Stored energy layer'] = storage_unit_info['Stored energy layer'] if 'Stored energy layer' in storage_unit_info.keys() else None
+        return storage_unit_info['Stored energy layer'] if storage_unit_info['Stored energy layer'] else f'Stored{safe_to_list(storage_unit_info['Layers'])[0]}'
 
 class ChargingUnit(Utility):
     efficiency: float 

@@ -8766,8 +8766,8 @@ set processes :=  'WindFarm';
 set markets :=  'Market';
 set storageUnits :=  'Battery';
 set standardUtilities :=
-     'BatteryCharger'
-     'BatteryDischarger';
+     'BatteryDischarger'
+     'BatteryCharger';
 set layers :=
      'Electricity'
      'StoredElectricity';
@@ -8786,10 +8786,10 @@ set layers :=
  set dischargingUtilitiesOfStorageUnit ['Battery'] :=  'BatteryDischarger';
 param POWER_MAX :=
      ['Market','Electricity'] -10000
-     ['BatteryCharger','StoredElectricity'] 9400
      ['BatteryCharger','Electricity'] -10000
-     ['BatteryDischarger','StoredElectricity'] 14400
-     ['BatteryDischarger','Electricity'] -15000;
+     ['BatteryCharger','StoredElectricity'] 9400
+     ['BatteryDischarger','Electricity'] 14400
+     ['BatteryDischarger','StoredElectricity'] -15000;
 param POWER :=
      ['WindFarm','Electricity',0] -56.579
      ['WindFarm','Electricity',1] -52.843

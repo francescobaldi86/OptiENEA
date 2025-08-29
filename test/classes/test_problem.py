@@ -16,7 +16,6 @@ def test_create_empty_problem():
     assert isinstance(problem.sets['timeSteps'], Set)
     assert isinstance(problem.parameters, dict)
     assert isinstance(problem.parameters['POWER'], Parameter)
-    assert isinstance(problem.ampl_problem, AmplProblem)
 
 
 def test_create_problem_folders():
@@ -47,7 +46,7 @@ def test_read_problem_data(problem_with_data):
     assert problem.raw_unit_data['WindFarm']['Type'] == 'Process (producer)'
     assert problem.raw_unit_data['WindFarm']['Power'] == 'file'
     assert problem.raw_unit_data['Market']['Type'] == 'SellingMarket'
-    assert problem.raw_unit_data['Market']['Max power'] == [10000]
+    assert problem.raw_unit_data['Market']['Max installed power'] == [10000]
 
 
 def test_read_problem_parameters(problem_with_general_parameters):

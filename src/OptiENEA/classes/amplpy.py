@@ -85,11 +85,11 @@ class AmplProblem(amplpy.AMPL):
             temp_sets[idx] = "set utilities := standardUtilities union markets union storageUnits;"
             temp_sets.insert(idx-1, "set storageUnits;")
         if self.has_time_dependent_max_power:
-            temp_sets.append("utilitiesWithTimeDependentMaxPower within utilities;")
-            temp_sets.append("utilitiesWithFixedMaxPower: utilities diff utilitiesWithTimeDependentMaxPower;")
+            temp_sets.append("set utilitiesWithTimeDependentMaxPower within utilities;")
+            temp_sets.append("set utilitiesWithFixedMaxPower:= utilities diff utilitiesWithTimeDependentMaxPower;")
         if self.has_time_dependent_energy_prices:
-            temp_sets.append("layersWithTimeDependentPrice within layers;")
-            temp_sets.append("layersWithFixedPrice: layers diff layersWithTimeDependentPrice;")
+            temp_sets.append("set layersWithTimeDependentPrice within layers;")
+            temp_sets.append("set layersWithFixedPrice:= layers diff layersWithTimeDependentPrice;")
         self.mod_string += "\n".join(temp_sets) + "\n\n\n"
 
     def write_parameters(self):
@@ -102,7 +102,7 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
-        temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit, t in timeSteps} default 1;")
+        temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
         if self.has_time_dependent_energy_prices:
             temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
         if self.has_storage:
@@ -112,8 +112,8 @@ class AmplProblem(amplpy.AMPL):
             temp_params.append("param STORAGE_CYCLIC_ACTIVE default 1;")
             idx = temp_params.index("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
-            idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit, t in timeSteps} default 1;")
-            temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit, t in timeSteps} default 1;"
+            idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
+            temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit[u], t in timeSteps} default 1;"
         self.mod_string += "\n".join(temp_params) + "\n\n\n"
         
     def write_variables(self):
@@ -158,7 +158,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. calculate_totex: TOTEX = CAPEX + OPEX;")
         # Constraints to be added depending on whether energy prices depend on the time step or not
         if self.has_time_dependent_energy_prices > 0:
-            temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n")
+            temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n")
         else: 
             temp_constraints.append("s.t. calculate_operating_cost_standard{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l]) * TIME_STEP_DURATION * OCCURRANCE;")
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
