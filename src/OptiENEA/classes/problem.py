@@ -214,9 +214,9 @@ class Problem:
                               self.parameters['ERATE'].list_content.append({'storageUnits': unit_name, 'ERATE': unit.e_rate})
                         else:
                               for layer in unit.layers:
-                                    self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_power[layer]})
-                                    if unit.time_dependent_capacity_factor:
-                                          temp = pd.DataFrame(index = unit.max_power[layer].index, columns = self.parameters['POWER_MAX_REL'].content.columns)
+                                    self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_installed_power[layer]})
+                                    if unit.time_dependent_capacity_factor[layer]:
+                                          temp = pd.DataFrame(index = unit.time_dependent_capacity_factor[layer].index, columns = self.parameters['POWER_MAX_REL'].content.columns)
                                           temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor
                                           temp.loc[:, 'nonStorageUtilities'] = unit_name
                                           temp.loc[:, 'layersOfUnit'] = layer

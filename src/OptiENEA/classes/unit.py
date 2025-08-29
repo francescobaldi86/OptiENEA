@@ -145,8 +145,8 @@ class Utility(Unit):
         self.specific_capex = self.info['Specific CAPEX']
         self.specific_opex = self.info['Specific OPEX']
         self.lifetime = self.info['Lifetime']
-        self.max_power = {l: 0 for l in self.layers}
-        self.time_dependent_capacity_factor = None
+        self.max_installed_power = {l: 0 for l in self.layers}
+        self.time_dependent_capacity_factor = {l: None for l in self.layers}
         self.calculate_annualized_capex(self.problem.interest_rate)
         self.read_max_installed_power()
         self.read_time_dependent_capacity_factor()
@@ -163,19 +163,28 @@ class Utility(Unit):
         if self.info['Type'] not in {'StorageUnit', 'ChargingUnit', 'DischargingUnit'}:
             if isinstance(self.info['Max installed power'], float) | isinstance(self.info['Max installed power'], int):
                 if len(self.layers) == 1:
-                    self.max_power[layer] = self.info['Max installed power']
+                    self.max_installed_power[self.layers[0]] = self.info['Max installed power']
                 else:
                     raise ValueError(f'The maximum installed power for unit {self.name} should be a list of {len(self.layers)} elements. A single value was provided')
             else:
                 for id, layer in enumerate(self.layers):
-                    self.max_power[layer] = self.info['Max installed power'][id]
+                    self.max_installed_power[layer] = self.info['Max installed power'][id]
 
     def read_time_dependent_capacity_factor(self):
-        if self.ts_data:
+        if self.ts_data is not None:
             if "Capacity factor" in self.ts_data.columns.levels[0]:
-                self.time_dependent_capacity_factor = self.ts_data.loc[:, ('Capacity factor', '')]
-
-
+                self.time_dependent_capacity_factor = {}
+                if 'All layers' in self.ts_data.columns.levels[1] and len(self.ts_data.loc[:, ('Capacity factor')] == 1):
+                    for layer in self.layers:
+                        self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', 'All layers')]
+                elif 'All layers' not in self.ts_data.columns.levels[1]:
+                    for layer in self.layers:
+                        if layer in self.ts_data.columns.levels[2]:
+                            self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', layer)]
+                        else:
+                            self.time_dependent_capacity_factor[layer] = None
+                else:
+                    raise(KeyError, f'Something is wrong with the data provided for the time-dependent capacity factor of unit {self.name}. There should be either one column per unit layer, or one single column with key "All layers" for the layer')
 
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
@@ -195,11 +204,14 @@ class StorageUnit(Utility):
     max_energy: float | int
     c_rate: float
     e_rate: float
+    stored_energy_layer: str
+    exchange_energy_layer: str
     
     def __init__(self, name, info, problem):
         super().__init__(name, info, problem)
         self.check_default_values('StorageUnit')     
         # Reading class-speficif values
+        self.exchange_energy_layer = self.layers[0]
         self.stored_energy_layer = info['Stored energy layer'] if info['Stored energy layer'] else f'Stored{self.layers[0]}'
         self.layers.append(self.stored_energy_layer)
         self.max_energy = self.info['Max energy']
@@ -213,7 +225,7 @@ class StorageUnit(Utility):
         stored_energy_layer = storage_unit_info['Stored energy layer'] if 'Stored energy layer' in storage_unit_info.keys() else f'Stored{storage_unit_info['Layers']}'
         output = {}
         output['Name'] = aux_unit_info['Name'] if 'Name' in aux_unit_info.keys() else f'{storage_unit_name}{aux_type.replace('ing','er')}'
-        output['Layers'] = [stored_energy_layer] + [storage_unit_info['Layers']]
+        output['Layers'] = [l for l in storage_unit_info['Layers']]
         if 'Energy requirement layer' in aux_unit_info.keys():
             output['Energy requirement layer'] = aux_unit_info['Energy requirement layer']
             output['Layers'].append(aux_unit_info['Energy requirement layer'])
@@ -246,14 +258,14 @@ class ChargingUnit(Utility):
         self.efficiency = self.info['Efficiency']
         if info['Energy requirement layer']:
             self.layers.append(info['Energy requirement layer'])
-            self.max_power = {
-                self.layers[0]: self.max_charging_power,
-                self.layers[1]: -self.max_charging_power,
+            self.max_installed_power = {
+                self.layers[0]: -self.max_charging_power,
+                self.layers[1]: self.max_charging_power,
                 self.layers[2]: -self.max_charging_power * (1-self.efficiency)}
         else:
-            self.max_power = {
-                self.layers[0]: self.max_charging_power * self.efficiency,
-                self.layers[1]: -self.max_charging_power}
+            self.max_installed_power = {
+                self.layers[0]: -self.max_charging_power,
+                self.layers[1]: self.max_charging_power * self.efficiency}
 
 class DischargingUnit(Utility):
     efficiency: float
@@ -270,12 +282,12 @@ class DischargingUnit(Utility):
         self.efficiency = self.info['Efficiency']
         if info['Energy requirement layer']:
             self.layers.append(info['Energy requirement layer'])
-            self.max_power = {
+            self.max_installed_power = {
                 self.layers[0]: self.max_discharging_power,
                 self.layers[1]: -self.max_discharging_power,
                 self.layers[2]: -self.max_discharging_power * (1-self.efficiency)}
         else:
-            self.max_power = {
+            self.max_installed_power = {
                 self.layers[0]: self.max_discharging_power * self.efficiency,
                 self.layers[1]: -self.max_discharging_power}
 
@@ -283,9 +295,8 @@ class DischargingUnit(Utility):
 
 class Market(Utility):
     energy_price: dict
-    activation_frequency: dict
     energy_price_variation: dict | None
-    has_time_dependent_energy_prices: bool
+    has_time_dependent_energy_prices: dict
     
     def __init__(self, name, info, problem):
         super().__init__(name, info, problem)
@@ -293,29 +304,49 @@ class Market(Utility):
             case 'PurchaseMarket' | 'Market':
                 pass
             case 'SellingMarket':
-                for layer_name, max_power in self.max_power.items():
-                    self.max_power[layer_name] = -max_power
-        self.energy_price = {layer: 0.0 for layer in self.layers}
-        self.energy_price_variation = {layer: None for layer in self.layers}
-        self.activation_frequency = safe_to_list(info['Activation frequency'])
-        self.has_time_dependent_energy_prices = False
-        # We assume the following possible scenarios:
-        # 1. Prices are not time-dependent: in this case, we read the value provided as the constant value
-        # 2. Prices are time-dependent, and they are provided by the user
-        # 3. Prices are time-dependent, the user provides average price and price variation
-        if "Time dependent price" not in self.info.keys():
-            for id, layer in enumerate(self.layers):
-                self.energy_price[layer] = safe_to_list(self.info['Price'])[id]
-        else:
-            self.has_time_dependent_energy_prices = True
-            if 'Price' not in self.info.keys():
-                for id, layer in enumerate(self.layers):
-                    self.energy_price[layer] = self.ts_data.loc[:, ('Market', layer)].mean()
-                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)]/self.energy_price[layer])
+                for layer_name, max_power in self.max_installed_power.items():
+                    self.max_installed_power[layer_name] = -max_power
+        self.read_prices()
+
+    def read_prices(self):
+        self.energy_price = {l: 0.0 for l in self.layers}
+        self.energy_price_variation = {l: None for l in self.layers}
+        self.has_time_dependent_energy_prices = {l: False for l in self.layers}
+        if self.ts_data is not None:
+            for layer in self.layers:
+                if ('Price variation', layer) in self.ts_data.columns or ('Price', layer) in self.ts_data.columns:
+                    self.has_time_dependent_energy_prices[layer] = True                    
+        for id, layer in enumerate(self.layers):
+            if self.has_time_dependent_energy_prices[layer] == False:
+                self.energy_price[layer] = self.info['Price'][id]
             else:
-                for id, layer in enumerate(self.layers):
-                    self.energy_price[layer] = safe_to_list(self.info['Price'])[id]
-                    self.energy_price_variation[layer] = (self.ts_data.loc[:, ('Market', layer)])
+                if 'Price' not in self.info.keys():
+                    self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
+                    self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]
+                elif isinstance(self.info['Price'][id], float | int) and ('Price variation', layer) in self.ts_data.columns: # Case 1: Price value and price variation
+                    average_price = self.ts_data.loc[:, ('Price variation', layer)].mean()
+                    maximum_price = self.ts_data.loc[:, ('Price variation', layer)].mean()
+                    if round(average_price, 1) == 1.0 or round(maximum_price,1) == 1.0:
+                        self.energy_price[layer] = self.info['Price'][id]
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price variation', layer)]
+                    else:
+                        raise ValueError(f'Time series and price values for market {self.name} are not consistent. The time series for price variation will be multiplied by the reference price, so it should be either a value with mean = 1 or with max = 1')
+                elif isinstance(self.info['Price'][id], float | int) and ('Price', layer) in self.ts_data.columns:  # Case 2: price value and "Price" column
+                    average_price = self.ts_data.loc[:, ('Price', layer)].mean()
+                    maximum_price = self.ts_data.loc[:, ('Price', layer)].mean()
+                    if round(average_price, 1) == 1.0 or round(maximum_price,1) == 1.0:
+                        self.energy_price[layer] = self.info['Price'][id]
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]
+                        Warning(f'Attention! For market unit {self.name} you provided both a fixed price and a time-dependent "Price". The latter has average 1, so it will be considered as adimensional')
+                    else:
+                        self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]    
+                        Warning(f'Market unit {self.name} was provided both with a fixed and a time-dependent price "Price". The fixed value will be ignored')
+                elif self.info['Price'][id] == 'file':
+                    self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
+                    self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]
+                else:
+                    raise ValueError(f'The "Price" should be a list of float or include the "file" value. {self.info['Price']} was provided for unit {self.name}')
 
     def check_data_consistency(self):
         assert len(self.layers) == len(self.activation_frequency)

@@ -58,5 +58,5 @@ def test_init_process_MLTS(problem_with_ts_data):
 @fixture
 def problem_with_ts_data():
     problem = Problem('')
-    problem.raw_timeseries_data = read_csv(os.path.join(__HERE__,"..","..","DATA","test_unit","data","power_test_process.csv"), sep=";", index_col=0, header=[0,1,2])
+    problem.raw_timeseries_data = read_csv(os.path.join(__HERE__,"..","..","DATA","test_unit","test_process_tsdata.csv"), sep=";", index_col=0, header=[0,1,2])
     return problem

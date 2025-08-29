@@ -102,7 +102,7 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
-        temp_params.append("param POWER_MAX_REL{u in utilities, t in timeSteps} default 1;")
+        temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit, t in timeSteps} default 1;")
         if self.has_time_dependent_energy_prices:
             temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
         if self.has_storage:
@@ -112,8 +112,8 @@ class AmplProblem(amplpy.AMPL):
             temp_params.append("param STORAGE_CYCLIC_ACTIVE default 1;")
             idx = temp_params.index("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
-            idy = temp_params.index("param POWER_MAX_REL{u in utilities, t in timeSteps} default 1;")
-            temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, t in timeSteps} default 1;"
+            idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit, t in timeSteps} default 1;")
+            temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit, t in timeSteps} default 1;"
         self.mod_string += "\n".join(temp_params) + "\n\n\n"
         
     def write_variables(self):
@@ -164,9 +164,9 @@ class AmplProblem(amplpy.AMPL):
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
         if self.has_time_dependent_max_power > 0:
             temp_constraints.append("s.t. component_load_standard{u in standardUtilities, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];")
-            temp_constraints.append("s.t. component_load_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,t];")
+            temp_constraints.append("s.t. component_load_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
             temp_constraints.append("s.t. market_limits_standard{u in markets, l in layersOfUnit[u], t in timeSteps: u in utilitiesWithFixedMaxPower}: POWER_MAX[u,l] <= power[u,l,t] <= 0;")
-            temp_constraints.append("s.t. market_limits_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,t] <= power[u,l,t] <= 0;")
+            temp_constraints.append("s.t. market_limits_time_dependent{u in utilitiesWithTimeDependentMaxPower, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
         else:
             temp_constraints.append("s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l];")
             temp_constraints.append("s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] <= power[u,l,t] <= 0;")
