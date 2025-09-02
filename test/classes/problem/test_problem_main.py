@@ -6,12 +6,12 @@ from OptiENEA.classes.unit import *
 import os, pytest, shutil, math
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
-__PARENT__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+__PARENT__ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 def test_create_empty_problem():
     # Tests the creation of an empty problem
-    problem = Problem(name = 'test_problem')
-    assert problem.name == 'test_problem'
+    problem = Problem(name = 'test_problem_main')
+    assert problem.name == 'test_problem_main'
     assert isinstance(problem.sets, dict)
     assert isinstance(problem.sets['timeSteps'], Set)
     assert isinstance(problem.parameters, dict)
@@ -20,18 +20,18 @@ def test_create_empty_problem():
 
 def test_create_problem_folders():
     # Once the problem has been created, it tests the creation of the related folders
-    os.mkdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem'))  
-    problem = Problem(name = 'test_problem', 
-                      problem_folder = os.path.join(__PARENT__,'PLAYGROUND','test_problem'))
+    os.mkdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main'))  
+    problem = Problem(name = 'test_problem_main', 
+                      problem_folder = os.path.join(__PARENT__,'PLAYGROUND','test_problem_main'))
     problem.create_folders()
     
-    assert os.path.isdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem'))
-    assert os.path.isdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem', 'Results'))
-    assert os.path.isdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem', 'Temporary files'))
+    assert os.path.isdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main'))
+    assert os.path.isdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main', 'Results'))
+    assert os.path.isdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main', 'Temporary files'))
 
-    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem', 'Results'))
-    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem', 'Temporary files'))
-    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem'))
+    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main', 'Results'))
+    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main', 'Temporary files'))
+    os.rmdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main'))
     
 
 def test_read_problem_data(problem_with_data):
@@ -121,15 +121,15 @@ def test_write_problem_output(solved_problem):
 
 @pytest.fixture
 def problem_base():
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', 'test_problem')
+    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', 'test_problem_main')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
     for filename in ('units.yml', 'general.yml', 'timeseries_data.csv'):
-        shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', filename), 
+        shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', 'test_problem_main', filename), 
                      os.path.join(input_data_folder, filename))
 
-    problem = Problem(name = 'test_problem', 
+    problem = Problem(name = 'test_problem_main', 
                       problem_folder = problem_folder)
     problem.create_folders()
     # Problem setup this way is what we want to give to tests

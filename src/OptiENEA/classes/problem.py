@@ -70,10 +70,11 @@ class Problem:
             validate_project_structure(self.problem_folder)
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
+            self.read_problem_parameters()
             self.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
             self.parse_sets()
             self.parse_parameters()
-            self.set_objective_function()  # Reads and sets the objective function
+            # self.set_objective_function()  # Reads and sets the objective function
             self.create_ampl_model()  # Creates the problem mod file
             self.solve_ampl_problem()  # Solves the optimization problem
             # self.read_output()  # Reads the output generated
@@ -167,7 +168,7 @@ class Problem:
 
       def parse_sets(self):
             # NOTE: The append method is a method of the class "Set"
-            self.sets['timeSteps'].content.update([int(x) for x in range(0, self.simulation_horizon, self.parameters['TIME_STEP_DURATION']())])
+            self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()))])
             for layer in self.layers:
                   self.sets['layers'].append(layer.name)
             for unit_name, unit in self.units.items():
@@ -215,9 +216,9 @@ class Problem:
                         else:
                               for layer in unit.layers:
                                     self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_installed_power[layer]})
-                                    if unit.time_dependent_capacity_factor[layer]:
+                                    if unit.time_dependent_capacity_factor[layer] is not None:
                                           temp = pd.DataFrame(index = unit.time_dependent_capacity_factor[layer].index, columns = self.parameters['POWER_MAX_REL'].content.columns)
-                                          temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor
+                                          temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor[layer]
                                           temp.loc[:, 'nonStorageUtilities'] = unit_name
                                           temp.loc[:, 'layersOfUnit'] = layer
                                           temp.loc[:, 'timeSteps'] = temp.index

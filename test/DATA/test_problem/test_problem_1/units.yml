@@ -1,0 +1,51 @@
+WindFarm:
+  Type: Utility
+  Layers: Electricity
+  Max installed power: 100
+  Specific CAPEX: 1968
+
+PV:
+  Type: Utility
+  Layers: Electricity
+  Max installed power: 1000
+  Specific CAPEX: 950
+
+SellingMarket:
+  Type: Market
+  Layers: [Electricity]
+  Main layer: Electricity
+  Price: [0.078]  # Units are kEUR/MWh, kEUR/MWh, kEUR/ton
+  Max installed power: [-10000]
+  Activation frequency: [1]
+  
+PurchaseMarket:
+  Type: Market
+  Layers: [Electricity]
+  Main layer: Electricity
+  Price: [0.245]  # Units are kEUR/MWh, kEUR/MWh, kEUR/ton
+  Max installed power: [10000]
+  Activation frequency: [1]
+  
+Factory:
+  Type: Process
+  Layers: [Electricity, Heat]
+  Power: [40, 86]
+
+Boiler:
+  Type: Utility
+  Layers: [Electricity, Heat]
+  Max installed power: [100, 95]
+  Specific CAPEX: 50
+
+Battery:
+  Type: StorageUnit
+  Layers: Electricity
+  Max energy: 10000
+  Specific CAPEX: 160
+  C-rate: 1.0
+  E-rate: 1.5
+  Charging unit info:
+    Efficiency: 0.94
+    Specific CAPEX: 40
+  Discharging unit info:
+    Efficiency: 0.96

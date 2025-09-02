@@ -179,7 +179,7 @@ class Utility(Unit):
                         self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', 'All layers')]
                 elif 'All layers' not in self.ts_data.columns.levels[1]:
                     for layer in self.layers:
-                        if layer in self.ts_data.columns.levels[2]:
+                        if layer in self.ts_data.columns.levels[1]:
                             self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', layer)]
                         else:
                             self.time_dependent_capacity_factor[layer] = None

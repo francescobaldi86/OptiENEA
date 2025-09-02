@@ -3,8 +3,8 @@ import os
 from collections import defaultdict
 
 REQUIRED_STRUCTURE = {
-    'folders': ['input', ],
-    'files': ['input/units.yaml', 'input/general.yml']
+    'folders': ['Input', ],
+    'files': ['Input/units.yml', 'Input/general.yml']
 }
 
 def read_config_file(filename: str, data_structure = {}) -> dict:
@@ -139,7 +139,8 @@ def validate_project_structure(project_path, required=REQUIRED_STRUCTURE):
 
     # Check required files
     for file in required.get('files', []):
-        file_path = os.path.join(project_path, file)
+        [folder_name, file_name] = file.split('/')
+        file_path = os.path.join(project_path, folder_name, file_name)
         if not os.path.isfile(file_path):
             missing_items.append(f"Missing file: {file}")
 
