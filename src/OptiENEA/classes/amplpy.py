@@ -150,12 +150,12 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. calculate_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];")
             temp_constraints.append("s.t. calculate_totex: TOTEX = CAPEX + OPEX;")
         # Constraints to be added depending on whether energy prices depend on the time step or not
-        temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;\n")
+        temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
         temp_constraints.append("s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
         # temp_constraints.append("s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
-        temp_constraints.append("s.t. purchase_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] > 0}: 0 <= power[u,l,t] <= POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
-        temp_constraints.append("s.t. selling_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] < 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
+        temp_constraints.append("s.t. purchase_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] >= 0}: 0 <= power[u,l,t] <= POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
+        temp_constraints.append("s.t. selling_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] <= 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
 
         # Constraints to be added depending on whether there are storage units in the problem
         if self.has_storage:
@@ -167,12 +167,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("\t\t\tenergyStorageLevel[u,l,t-1] - power[u,l,t]*TIME_STEP_DURATION")
             temp_constraints.append("\t);")
             temp_constraints.append("s.t. storage_cyclic_constraint{u in storageUnits, l in layersOfUnit[u]}:")
-            temp_constraints.append("\tenergyStorageLevel0[u,l] >= (if STORAGE_CYCLIC_ACTIVE == 1")
-            temp_constraints.append("\t\tthen")
-            temp_constraints.append("\t\t\tenergyStorageLevel[u,l,card(timeSteps)-1] ")
-            temp_constraints.append("\t\telse")
-            temp_constraints.append("\t\t\t0")
-            temp_constraints.append("\t);")
+            temp_constraints.append("\tenergyStorageLevel[u,l,1] <= STORAGE_CYCLIC_ACTIVE * energyStorageLevel[u,l,card(timeSteps)-1];")
             temp_constraints.append("s.t. storage_max_energy{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,t] <= size[u];")
             temp_constraints.append("s.t. storage_max_energy2{u in storageUnits}:")

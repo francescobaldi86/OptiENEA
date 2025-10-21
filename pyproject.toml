@@ -5,9 +5,10 @@ requires = [
     "matplotlib",
     "numpy",
     "xlsxwriter",
-    "yaml",
+    "pyyaml",
     "amplpy",
-    "dataclasses"
+    "dataclasses",
+    "xlsxwriter",
     ]
 build-backend = "setuptools.build_meta"
 

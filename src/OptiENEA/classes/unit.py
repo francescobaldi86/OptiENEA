@@ -99,16 +99,15 @@ class Process(Unit):
                 
     def read_power_input(self):
         if len(self.layers) == 1:  # One single value is acceptable only if the process only has one layer
-            if isinstance(self.info['Power'], float|int):
-                self.power[self.layers[0]] = self.info['Power']
-            elif isinstance(self.info['Power'], list):
-                if len(self.info['Power']) == 1:
-                    self.power[self.layers[0]] = self.info['Power'][0]
+            power_info = safe_to_list(self.info['Power'])
+            if len(power_info) == 1:
+                if isinstance(power_info[0], float|int):
+                    self.power[self.layers[0]] = self.info['Power']
+                elif power_info[0] == 'file':
+                    self.power[self.layers[0]] = self.ts_data.loc[:, ('Power', self.layers[0])]
+                    self.has_time_dependent_power = True
                 else:
-                    raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
-            elif self.info['Power'] == 'file':
-                self.power[self.layers[0]] = self.ts_data.loc[:, ('Power', self.layers[0])]
-                self.has_time_dependent_power = True
+                    raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')    
             else:
                 raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')
         elif isinstance(self.info['Power'], list):
@@ -213,7 +212,7 @@ class StorageUnit(Utility):
         # Reading class-speficif values
         self.exchange_energy_layer = self.layers[0]
         self.stored_energy_layer = StorageUnit.storage_layer_name(info)
-        self.layers.append(self.stored_energy_layer)
+        self.layers = [self.stored_energy_layer]
         self.max_energy = self.info['Max energy']
         self.c_rate = self.info['C-rate']
         self.e_rate = self.info['E-rate']

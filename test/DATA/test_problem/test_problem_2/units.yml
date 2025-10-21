@@ -1,0 +1,65 @@
+PV:
+  Type: Utility
+  Layers: Electricity
+  Max installed power: 10  # kW
+  Specific CAPEX: 950  # EUR/kW
+
+SellingMarket:
+  Type: Market
+  Layers: [Electricity]
+  Main layer: Electricity
+  Price: [0.078]  # EUR/kWh
+  Max installed power: [-10]  # kW
+  Activation frequency: [1]
+  
+PurchaseMarket:
+  Type: Market
+  Layers: [Electricity]
+  Main layer: Electricity
+  Price: [0.245]  # EUR/kWh
+  Max installed power: [10]  # kW
+  Activation frequency: [1]
+  
+Household:
+  Type: Process
+  Layers: [Electricity, DHW]
+  Power: [file, file]
+
+Boiler:
+  Type: Utility
+  Layers: [Electricity, DHW]
+  MainLayer: Electricity
+  Max installed power: [-10.5, 10]
+  Specific CAPEX: 20  # EUR/kW
+
+HeatPump:
+  Type: Utility
+  Layers: [Electricity, DHW]
+  MainLayer: Electricity
+  Max installed power: [-3.5, 10]
+  Specific CAPEX: 1350  # EUR/kW
+
+HotWaterStorage:
+  Type: StorageUnit
+  Layers: DHW
+  Stored energy layer: HotWater
+  Max energy: 20  # kWh
+  Specific CAPEX: 15  # EUR/kWh
+  C-rate: 0.1
+  E-rate: 10.0
+  Charging unit info:
+    Efficiency: 0.99
+  Discharging unit info:
+    Efficiency: 0.99
+
+Battery:
+  Type: StorageUnit
+  Layers: Electricity
+  Max energy: 10 # kWh
+  Specific CAPEX: 160
+  C-rate: 1.0
+  E-rate: 1.5
+  Charging unit info:
+    Efficiency: 0.94
+  Discharging unit info:
+    Efficiency: 0.96

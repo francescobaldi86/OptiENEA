@@ -137,8 +137,8 @@ class Problem:
             """            
             # Processing units data
             # first we parse Storage Units, so to add the corresponding charging and discharging units to the list
+            auxiliary_units = {}
             for unit_name, unit_info in self.raw_unit_data.items():
-                  auxiliary_units = {}
                   if unit_info['Type'] == 'StorageUnit':
                         charging_unit_info = StorageUnit.create_auxiliary_unit_info(unit_name, unit_info, 'Charging')
                         discharging_unit_info = StorageUnit.create_auxiliary_unit_info(unit_name, unit_info, 'Discharging')
@@ -247,7 +247,8 @@ class Problem:
       def create_ampl_model(self):
             # Based on the available information, create the mod file
             self.ampl_problem = AmplProblem(self)
-            self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary files', f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}')
+            self.run_name = f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
+            self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary files', self.run_name)
             os.mkdir(self.ampl_problem.temp_folder)
             self.ampl_problem.parse_problem_settings()
             self.ampl_problem.write_mod_file()
@@ -289,11 +290,17 @@ class Problem:
                   else:
                         output[var_name] = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
                         output[var_name].columns = [x.strip('.val') for x in output[var_name].columns]
+            output['timeseries_full'] = output['timeseries']
+            columns_to_drop = []
+            for column in output['timeseries'].columns:
+                  if (output['timeseries'][column] == 0).all():
+                        columns_to_drop.append(column)
+            output['timeseries'] = output['timeseries'].drop(columns=columns_to_drop, axis=1)
             output['kpis'] = pd.DataFrame(output['kpis'])
-            with pd.ExcelWriter(os.path.join(self.problem_folder, 'Results', "Results.xlsx"), engine="xlsxwriter") as writer:
+            with pd.ExcelWriter(os.path.join(self.problem_folder, 'Results', f"Results_{self.run_name}.xlsx"), engine="xlsxwriter") as writer:
                   for sheet_name, df in output.items():
                         if not df.empty:
-                              df.to_excel(writer, sheet_name=sheet_name)
+                              df.to_excel(writer, sheet_name=sheet_name, float_format = "%.3f")
 
 
 

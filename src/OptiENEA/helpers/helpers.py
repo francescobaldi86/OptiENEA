@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from collections import defaultdict
-
+import stat, shutil, time
 REQUIRED_STRUCTURE = {
     'folders': ['Input', ],
     'files': ['Input/units.yml', 'Input/general.yml']
@@ -156,3 +156,18 @@ def to_dict(d):
     if isinstance(d, defaultdict):
         return {k: to_dict(v) for k, v in d.items()}
     return d
+
+def handle_remove_readonly(func, path, exc_info):
+    """Clear the readonly bit and reattempt the removal."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+def safe_rmtree(path, retries=3, delay=0.1):
+    for i in range(retries):
+        try:
+            shutil.rmtree(path, onerror=handle_remove_readonly)
+            return
+        except PermissionError:
+            time.sleep(delay)
+    # if it still fails, raise
+    shutil.rmtree(path, onerror=handle_remove_readonly)
