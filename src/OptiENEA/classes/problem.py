@@ -209,6 +209,8 @@ class Problem:
                               self.parameters['POWER'].list_content.append(temp)
                   elif isinstance(unit, Utility):
                         self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
+                        if unit.has_minimum_installed_power:
+                              self.parameters['POWER_MIN'].list_content.append({'utilities': unit_name, 'POWER_MIN': unit.minimum_installed_power})
                         if isinstance(unit, StorageUnit):
                               self.parameters['ENERGY_MAX'].list_content.append({'storageUnits': unit_name, 'ENERGY_MAX': unit.max_energy})
                               self.parameters['CRATE'].list_content.append({'storageUnits': unit_name, 'CRATE': unit.c_rate})

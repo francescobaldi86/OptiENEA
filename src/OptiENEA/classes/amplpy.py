@@ -10,6 +10,7 @@ class AmplProblem(amplpy.AMPL):
     has_time_dependent_energy_prices: bool
     units_with_time_dependent_maximum_power: list
     layers_with_time_dependent_price: list
+    has_minimum_installed_power: bool
 
     def __init__(self, problem):
         super().__init__()
@@ -18,6 +19,7 @@ class AmplProblem(amplpy.AMPL):
         self.has_time_dependent_power = False
         self.has_time_dependent_max_power = False
         self.has_time_dependent_energy_prices = False
+        self.has_minimum_installed_power = False
         self.units_with_time_dependent_maximum_power = []
         self.layers_with_time_dependent_price = []
         self.problem = problem
@@ -43,6 +45,8 @@ class AmplProblem(amplpy.AMPL):
             if isinstance(unit, ut.Utility):
                 if unit.specific_capex >= 1:
                     self.has_capex = True
+                if unit.has_minimum_installed_power:
+                    self.has_minimum_installed_power = True
                 if isinstance(unit, ut.StandardUtility):
                     if unit.has_time_dependent_max_power:
                         self.has_time_dependent_max_power = True
@@ -98,6 +102,8 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
         temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
+        if self.has_minimum_installed_power:
+            temp_params.append("param POWER_MIN{u in nonmarketUtilities} default 0;")
         if self.has_storage:
             temp_params.append("param ENERGY_MAX{u in storageUnits} default 0;")
             temp_params.append("param CRATE{u in storageUnits} default 1;")
@@ -145,10 +151,13 @@ class AmplProblem(amplpy.AMPL):
         temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = -POWER[p,l,t];")
         # Constraints to be added depending on whether we are calculating the cost of the investment or not
         if self.has_capex:
-            temp_constraints.append("s.t. componentSizing{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps}: size[u] >= ics[u,t] * abs(POWER_MAX[u,l]);")
+            temp_constraints.append("s.t. component_sizing{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps}: size[u] >= ics[u,t] * abs(POWER_MAX[u,l]);")
             temp_constraints.append("s.t. calculate_capex: CAPEX = sum{u in nonmarketUtilities} unitAnnualizedInvestmentCost[u];")
             temp_constraints.append("s.t. calculate_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];")
             temp_constraints.append("s.t. calculate_totex: TOTEX = CAPEX + OPEX;")
+        # Constraints added only if the problem has units with a minimum installed size
+        if self.has_minimum_installed_power:
+            temp_constraints.append("s.t. minimum_installed_power{u in nonmarketUtilities}: size[u] >= POWER_MIN[u];")
         # Constraints to be added depending on whether energy prices depend on the time step or not
         temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not

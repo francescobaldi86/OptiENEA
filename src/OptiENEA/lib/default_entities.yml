@@ -19,6 +19,8 @@ PARAMETERS:
   STORAGE_CYCLIC_ACTIVE:
   SPECIFIC_INVESTMENT_COST_ANNUALIZED: 
     - utilities
+  POWER_MIN:
+    - utilities
   CRATE:
     - storageUnits
   ERATE:
