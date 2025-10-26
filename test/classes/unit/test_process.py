@@ -23,7 +23,7 @@ def test_init_process_SLLV():
     TEST_INFO_PROCESS['Layers'] = ['Electricity']
     TEST_INFO_PROCESS['Power'] = [10]
     process = Process('TestProcess', TEST_INFO_PROCESS, Problem(''))
-    assert process.power['Electricity'] == 10
+    assert process.power['Electricity'] == [10]
 def test_init_process_SLTS(problem_with_ts_data):
     # Tests the creation of a process
     # 3 - Single layer, values provided as a time series

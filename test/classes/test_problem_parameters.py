@@ -1,26 +1,33 @@
 from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.problem import Problem
-import os
+import os, shutil, math
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
+__PARENT__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
-def test_problem_parameters_empty_init():
+def test_problem_main_settings_default():
     # Tests the initialization of a problem parameters instance
-    problem_parameters = ProblemParameters()
-    assert problem_parameters.interpreter == 'ampl'
-    assert problem_parameters.solver == 'highs'
-    assert problem_parameters.interest_rate == 0.06
-    assert problem_parameters.simulation_horizon == 8760
+    problem = Problem(name = 'Test')
+    assert problem.interpreter == 'ampl'
+    assert problem.solver == 'highs'
+    assert problem.interest_rate == 0.06
+    assert problem.simulation_horizon == 8760
 
-def test_read_problem_parameters():
+def test_read_problem_main_settings_from_file():
     # Tries reading the data from some example files
+    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', 'test_problem_parameter')
+    input_data_folder = os.path.join(problem_folder, 'Input')
+    os.mkdir(problem_folder)
+    os.mkdir(input_data_folder)
+    for filename in ('units.yml', 'general.yml', 'timeseries_data.csv'):
+        shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', filename), 
+                     os.path.join(input_data_folder, filename))
     problem = Problem(name = 'test_problem', 
-                      problem_folder = f'{__HERE__}\\..\\DATA\\test_problem_data',
-                      check_input_data=False, 
-                      create_problem_folders=False)
+                      problem_folder = problem_folder)
     problem.read_problem_data()
-    problem_parameters = ProblemParameters()
-    problem_parameters.read_problem_paramters(problem.raw_general_data)
-    assert problem_parameters.interest_rate == 0.07
-    assert problem_parameters.ampl_parameters['OCCURRENCE'] == [1]
-    assert problem_parameters.ampl_parameters['TIME_STEP_DURATION'] == [1]
+    problem.read_problem_parameters()
+    assert problem.interpreter == 'ampl'
+    assert problem.solver == 'highs'
+    assert problem.interest_rate == 0.07
+    assert problem.simulation_horizon == 168
+    shutil.rmtree(problem_folder)

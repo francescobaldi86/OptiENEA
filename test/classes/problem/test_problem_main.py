@@ -113,7 +113,7 @@ def test_write_problem_output(solved_problem):
     # Here we check that the file was generated, and that it contains the right sheets
     for sheet in ['kpis', 'units', 'timeseries']:
         _ = pd.read_excel(
-            os.path.join(solved_problem.problem_folder, 'Results', 'Results.xlsx'),
+            os.path.join(solved_problem.problem_folder, 'Results', f"Results_{solved_problem.run_name}.xlsx"),
             sheet_name = sheet
         )
     assert True

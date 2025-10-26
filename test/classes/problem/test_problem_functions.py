@@ -22,6 +22,8 @@ def test_problem_with_min_installed_power():
                       problem_folder = problem_folder)
     problem.run()
     assert math.isclose(problem.ampl_problem.get_variable('size')['CHPEngine'].value(),0,abs_tol = 0.1)
+    shutil.rmtree(os.path.join(problem_folder, 'Temporary files'))
+    shutil.rmtree(os.path.join(problem_folder, 'Results'))
     # Then, Modify the YAML file to add the "minimum installed power" input
     with open(os.path.join(input_data_folder,'units.yml'), "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)

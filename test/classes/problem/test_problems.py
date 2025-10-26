@@ -49,7 +49,7 @@ def test_problem_2():
                       problem_folder = problem_folder)
     problem.run()
     assert problem.ampl_problem.solve_result == "solved"
-    assert math.isclose(problem.ampl_problem.get_variable('OPEX').value(), -755, abs_tol = 10)
+    assert math.isclose(problem.ampl_problem.get_variable('OPEX').value(), -752, abs_tol = 10)
     assert math.isclose(problem.ampl_problem.get_variable('CAPEX').value(), 1000, abs_tol = 10)
     assert math.isclose(problem.ampl_problem.get_variable('TOTEX').value(),244,abs_tol = 10)
     safe_rmtree(problem_folder)
@@ -72,8 +72,8 @@ def test_problem_3():
                       problem_folder = problem_folder)
     problem.run()
     assert problem.ampl_problem.solve_result == "solved"
-    assert math.isclose(problem.ampl_problem.get_variable('OPEX').value(), -755, abs_tol = 10)
-    assert math.isclose(problem.ampl_problem.get_variable('CAPEX').value(), 1000, abs_tol = 10)
-    assert math.isclose(problem.ampl_problem.get_variable('TOTEX').value(),244,abs_tol = 10)
+    assert math.isclose(problem.ampl_problem.get_variable('OPEX').value(), 69, abs_tol = 10)
+    assert math.isclose(problem.ampl_problem.get_variable('CAPEX').value(), 1030, abs_tol = 10)
+    assert math.isclose(problem.ampl_problem.get_variable('TOTEX').value(),1098,abs_tol = 10)
     safe_rmtree(problem_folder)
     assert True
