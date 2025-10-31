@@ -171,3 +171,15 @@ def safe_rmtree(path, retries=3, delay=0.1):
             time.sleep(delay)
     # if it still fails, raise
     shutil.rmtree(path, onerror=handle_remove_readonly)
+
+def get_from_path(d, path):
+    for key in path:
+        d = d[key]
+    return d
+
+def set_in_path(d, path, value):
+    current = d
+    for key in path[:-1]:
+        current = current[key]
+    current[path[-1]] = value
+    return d

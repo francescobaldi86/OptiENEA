@@ -37,7 +37,7 @@ class AmplProblem(amplpy.AMPL):
             else:
                 self.set[s.name] = list(s.content)
 
-    def parse_problem_settings(self):
+    def parse_problem_settings_backup(self):
         for _, unit in self.problem.units.items():
             if isinstance(unit, ut.Process):
                 if unit.has_time_dependent_power:
@@ -55,7 +55,31 @@ class AmplProblem(amplpy.AMPL):
                 elif isinstance(unit, ut.Market):
                     if unit.has_time_dependent_energy_prices:
                         self.has_time_dependent_energy_prices = True
-                
+
+    def parse_problem_settings(self):
+        # Check if problem has time-dependent power input
+        for process in self.problem.sets['processes'].content:
+            for layer in self.problem.sets['layersOfUnit'].content[process]:
+                if len(self.problem.parameters['POWER'].content.loc[(process, layer, ), 'POWER']) == self.problem.simulation_horizon:
+                    self.has_time_dependent_power = True
+                    break
+            if self.has_time_dependent_power:
+                break        
+        # Check if problem has capex
+        if not self.problem.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].content.empty:
+            self.has_capex = True
+        # Check if problem has minimum installed power
+        if not self.problem.parameters['POWER_MIN'].content.empty:
+            self.has_minimum_installed_power = True
+        # Check if problem has time-dependent max power
+        if not self.problem.parameters['POWER_MAX_REL'].content.empty:
+            self.has_time_dependent_max_power = True
+        # Check if problem has storage units
+        if not self.problem.parameters['ENERGY_MAX'].content.empty:
+            self.has_storage = True
+        # Check if problem has time-dependent energy prices
+        if not self.problem.parameters['ENERGY_PRICE_VARIATION'].content.empty:
+            self.has_time_dependent_energy_prices = True
 
     def write_mod_file(self):
         self.write_sets()

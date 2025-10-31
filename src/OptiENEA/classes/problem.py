@@ -17,12 +17,14 @@ from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplProblem
-from OptiENEA.helpers.helpers import validate_project_structure
+from OptiENEA.helpers.helpers import validate_project_structure, set_in_path
 
 class Problem:
       name: str
       problem_folder: str
       temp_folder: str
+      input_folder: str
+      results_folder: str
       units: dict[Unit] | None
       sets: dict[Set] | None
       parameters: dict
@@ -40,14 +42,17 @@ class Problem:
       ampl_parameters : dict
 
       # Initialization function
-      def __init__(self, name: str, problem_folder = None, temp_folder = None):
+      def __init__(self, name: str, problem_folder = None, temp_folder = None, input_folder = None, results_folder = None):
             """
             :param: problem_folder        the folder where the main content of the problem is (data, results, etc)
             :param: temp_folder           the temporary folder where temporary data is saved. Useful to specify if problem_folder is on cloud and many simulations are expected
             """
             self.name = name
             self.problem_folder = problem_folder or Path(sys.argv[0]).resolve().parent
-            self.temp_folder = temp_folder
+            self.temp_folder = temp_folder or os.path.join(self.problem_folder, 'Temporary files')
+            self.input_folder = input_folder or os.path.join(self.problem_folder, 'Input')
+            self.results_folder = results_folder or os.path.join(self.problem_folder, 'Results')
+            self
             self.units = {}
             self.sets = Set.create_empty_sets()
             self.parameters = Parameter.create_empty_parameters()
@@ -62,6 +67,10 @@ class Problem:
             self.raw_general_data = {}
             self.raw_unit_data = {}
 
+      def load_problem_data():
+            """
+            This is basically creating the problem and loading all the data but not running it
+            """
 
       def run(self):
             """
@@ -81,16 +90,18 @@ class Problem:
             self.save_output()  # Saves the output into useful and readable data structures
             # self.generate_plots()  # Generates required figures
 
-
       def create_folders(self):
             """
             Creates the project folders
             """
-            for folder in ['Results', 'Temporary files']:
-                  try:
-                        os.mkdir(os.path.join(self.problem_folder,folder))
-                  except FileExistsError:
-                        pass  # Insert log
+            try:
+                  os.mkdir(self.temp_folder)
+            except FileExistsError:
+                  pass
+            try:
+                  os.mkdir(self.results_folder)
+            except FileExistsError:
+                  pass  
 
       def read_problem_data(self):
             """
@@ -99,19 +110,32 @@ class Problem:
                   - 'units.yml' for data related to problem units
                   - 'general.yml' for general data about the problem
             """
-            with open(os.path.join(self.problem_folder, 'Input','units.yml'), 'r') as stream:
+            with open(os.path.join(self.input_folder, 'units.yml'), 'r') as stream:
                   self.raw_unit_data = yaml.safe_load(stream)
-            with open(os.path.join(self.problem_folder, 'Input','general.yml'), 'r') as stream:
+            with open(os.path.join(self.input_folder, 'general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
             try:
                   self.raw_timeseries_data = pd.read_csv(
-                        os.path.join(self.problem_folder, 'Input', 'timeseries_data.csv'), 
+                        os.path.join(self.input_folder, 'timeseries_data.csv'), 
                         header = [0,1,2], 
                         index_col = 0, 
                         sep = ";")
             except FileNotFoundError:
                   pass
                   # Requires logging
+
+      def update_problem_data(self, type: str, path: tuple, value: float):
+            """
+            This method is used to update raw problem data before they are parsed
+            :param: path   A tuple containing the "path" to a specific parameter value
+            :param: value  A float, the value we want to set
+            """
+            match type:
+                  case 'general':
+                        self.raw_general_data = set_in_path(self.raw_general_data, path, value)
+                  case 'units':
+                        self.raw_unit_data = set_in_path(self.raw_unit_data, path, value)
+
      
       def read_problem_parameters(self):
             # Reads the problem's general data into the deidcated structure
@@ -129,7 +153,6 @@ class Problem:
             # self.number_of_typical_days = len(self.parameters["OCCURRANCE"])
             self.objective = ObjectiveFunction(self.raw_general_data['Settings']['Objective'])
       
-
       def read_units_data(self):
             """
             Processes the problem data read by read_problem_data (which is basically a multi-level dictionary)
@@ -245,12 +268,28 @@ class Problem:
                               parameter.content = pd.DataFrame(parameter.list_content)
                         parameter.content = parameter.content.set_index([x for x in parameter.content.columns if x != param_name])
 
+      def update_problem_parameters(self, name, indexing, value):
+            """
+            Updates a problem parameter that has already been loaded, based on a "path" object
+            :param: name      The name of the parameter that we want to update
+            :param: indexing  The index of the value that we want to update
+            :param: value     The new value of the parameter 
+            """
+            if isinstance(self.parameters[name].content, float | int):
+                  self.parameters[name].content = value
+            elif isinstance(self.parameters[name].content, pd.DataFrame):
+                  if self.parameters[name].content.empty:
+                        self.parameters[name].content = self.parameters[name].content.set_index(list(self.parameters[name].content.columns[:-1]))     
+                  if len(indexing) == 1:
+                        indexing = indexing[0]
+                  self.parameters[name].content.loc[indexing, name] = value
+
       
-      def create_ampl_model(self):
+      def create_ampl_model(self, run_name: str | None = None):
             # Based on the available information, create the mod file
             self.ampl_problem = AmplProblem(self)
-            self.run_name = f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
-            self.ampl_problem.temp_folder = os.path.join(self.problem_folder,'Temporary files', self.run_name)
+            self.run_name = run_name if run_name else f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
+            self.ampl_problem.temp_folder = os.path.join(self.temp_folder, self.run_name)
             os.mkdir(self.ampl_problem.temp_folder)
             self.ampl_problem.parse_problem_settings()
             self.ampl_problem.write_mod_file()
@@ -298,8 +337,8 @@ class Problem:
                   if (output['timeseries'][column] == 0).all():
                         columns_to_drop.append(column)
             output['timeseries'] = output['timeseries'].drop(columns=columns_to_drop, axis=1)
-            output['kpis'] = pd.DataFrame(output['kpis'])
-            with pd.ExcelWriter(os.path.join(self.problem_folder, 'Results', f"Results_{self.run_name}.xlsx"), engine="xlsxwriter") as writer:
+            output['kpis'] = pd.DataFrame(output['kpis']).set_index('KPI')
+            with pd.ExcelWriter(os.path.join(self.results_folder, f"Results_{self.run_name}.xlsx"), engine="xlsxwriter") as writer:
                   for sheet_name, df in output.items():
                         if not df.empty:
                               df.to_excel(writer, sheet_name=sheet_name, float_format = "%.3f")
