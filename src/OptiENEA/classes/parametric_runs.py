@@ -47,12 +47,13 @@ class ParametricRuns():
             for param in self.scenarios_description.columns:
                 if pd.isna(self.scenarios_description.loc[scenario, param]):
                     self.scenarios_description.loc[scenario, param] = self.scenarios_description.loc[baseline_scenario, param]
+        self.scenarios_description.insert(0, 'Run name', 'temp')
 
     def run(self):
         # Runs the scenarios loaded
         self.create_folders()
         parameters_to_update = self.check_parameters_to_update()
-        self.scenarios_description.insert(0, 'Run name', 'temp')
+        
         for scenario in self.scenarios_description.index:
             problem = Problem(
                 name = self.problem.name, 
@@ -76,6 +77,7 @@ class ParametricRuns():
             problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
             problem.solve_ampl_problem()  # Solves the optimization problem
             problem.save_output()  # Saves the output into useful and readable data structures
+        self.generate_summary_output_file()
 
     def create_folders(self):
         try:
@@ -96,14 +98,14 @@ class ParametricRuns():
         kpi_columns = kpi_columns + [('Output', self.kpis.loc[x, 'Name']) for x in self.kpis.index if self.kpis.loc[x, 'Indexing'] == '-']
         temp_kpi = pd.DataFrame(index = self.output.index, columns = pd.MultiIndex.from_tuples(kpi_columns))
         for scenario in self.scenarios_description.index:
-            temp_output_kpis, temp_output_units = self.read_optimization_output_files(self.output.loc[scenario, ('Input','Run name')])
+            temp_output_kpis, temp_output_units = self.read_optimization_output_files(self.output.loc[scenario, ('Input','Run name:::')], scenario)
             for kpi in kpi_columns:
                 if len(kpi[1].split(':')) == 1:
                     temp_kpi.loc[scenario, kpi] = temp_output_kpis.loc[kpi[1]].Value
                 else:
                     temp_kpi.loc[scenario, kpi] = temp_output_units.loc[kpi[1].split(':')[1], kpi[1].split(':')[0]]
         self.output = self.output.combine_first(temp_kpi)
-        self.output.to_excel(os.path.join(self.problem_folder, f'{self.name}_parametric_results.xlsx'))
+        self.output.to_excel(os.path.join(self.parametric_runs_folder, f'{self.name}_parametric_results.xlsx'))
 
         
     def scenarios_to_run(self, scenarios_to_run: str = 'all'):
@@ -140,15 +142,20 @@ class ParametricRuns():
             problem.update_problem_parameters(param_name, indexing, self.scenarios_description.loc[scenario, param])
         return problem
 
-    def read_optimization_output_files(self, run_name):
+    def read_optimization_output_files(self, run_name, scenario):
+        if run_name == 'temp':
+            file_list = [f for f in os.listdir(os.path.join(self.parametric_runs_folder, 'Results')) if os.path.isfile(os.path.join(self.parametric_runs_folder, 'Results', f))]
+            file_name = [f for f in file_list if f'Scenario {scenario}' in f][0]
+        else:
+            file_name = f'Results_{run_name}.xlsx'
         kpis = pd.read_excel(
-            os.path.join(self.parametric_runs_folder, "Results", f'Results_{run_name}.xlsx'),
+            os.path.join(self.parametric_runs_folder, "Results", file_name),
             'kpis',
             header = 0, 
             index_col = 0,
         )
         units = pd.read_excel(
-            os.path.join(self.parametric_runs_folder, "Results", f'Results_{run_name}.xlsx'),
+            os.path.join(self.parametric_runs_folder, "Results", file_name),
             'units',
             header = 0, 
             index_col = 0,

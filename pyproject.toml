@@ -8,7 +8,6 @@ requires = [
     "pyyaml",
     "amplpy",
     "dataclasses",
-    "xlsxwriter",
     ]
 build-backend = "setuptools.build_meta"
 
