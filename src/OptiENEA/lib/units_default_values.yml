@@ -12,6 +12,7 @@ Utility:
   Specific OPEX: 0.0
   Max installed power:
   Min installed power: 0
+  Min size if installed: 0
 
 StorageUnit:
   Max energy: 10000000

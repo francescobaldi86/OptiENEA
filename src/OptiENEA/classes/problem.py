@@ -202,6 +202,8 @@ class Problem:
                         self.sets['processes'].append(unit_name)
                   if isinstance(unit, StandardUtility):
                         self.sets['standardUtilities'].append(unit_name)
+                        if unit.has_minimum_size_if_installed:
+                              self.sets['unitsWithMinimumSizeIfInstalled'].append(unit_name)
                   if isinstance(unit, StorageUnit):
                         self.sets['storageUnits'].append(unit_name)
                   if isinstance(unit, ChargingUnit):
@@ -234,6 +236,8 @@ class Problem:
                         self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
                         if unit.has_minimum_installed_power:
                               self.parameters['POWER_MIN'].list_content.append({'utilities': unit_name, 'POWER_MIN': unit.minimum_installed_power})
+                        if unit.has_minimum_size_if_installed:
+                              self.parameters['SIZE_MIN_IF_INSTALLED'].list_content.append({'unitsWithMinimumSizeIfInstalled': unit_name, 'SIZE_MIN_IF_INSTALLED': unit.minimum_size_if_installed})
                         if isinstance(unit, StorageUnit):
                               self.parameters['ENERGY_MAX'].list_content.append({'storageUnits': unit_name, 'ENERGY_MAX': unit.max_energy})
                               self.parameters['CRATE'].list_content.append({'storageUnits': unit_name, 'CRATE': unit.c_rate})

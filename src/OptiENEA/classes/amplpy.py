@@ -11,6 +11,7 @@ class AmplProblem(amplpy.AMPL):
     units_with_time_dependent_maximum_power: list
     layers_with_time_dependent_price: list
     has_minimum_installed_power: bool
+    has_units_with_minimum_size_if_installed: bool
 
     def __init__(self, problem):
         super().__init__()
@@ -20,6 +21,7 @@ class AmplProblem(amplpy.AMPL):
         self.has_time_dependent_max_power = False
         self.has_time_dependent_energy_prices = False
         self.has_minimum_installed_power = False
+        self.has_units_with_minimum_size_if_installed = False
         self.units_with_time_dependent_maximum_power = []
         self.layers_with_time_dependent_price = []
         self.problem = problem
@@ -80,6 +82,9 @@ class AmplProblem(amplpy.AMPL):
         # Check if problem has time-dependent energy prices
         if not self.problem.parameters['ENERGY_PRICE_VARIATION'].content.empty:
             self.has_time_dependent_energy_prices = True
+        # Check if problem has units that can only be installed with a minmium size:
+        if len(self.problem.sets['unitsWithMinimumSizeIfInstalled'].content) > 0:
+            self.has_units_with_minimum_size_if_installed = True
 
     def write_mod_file(self):
         self.write_sets()
@@ -112,6 +117,8 @@ class AmplProblem(amplpy.AMPL):
             idx = temp_sets.index("set utilities := standardUtilities union markets;")
             temp_sets[idx] = "set utilities := standardUtilities union markets union storageUnits;"
             temp_sets.insert(idx-1, "set storageUnits;")
+        if self.has_units_with_minimum_size_if_installed:
+            temp_sets.append("set unitsWithMinimumSizeIfInstalled within nonmarketUtilities;")
         self.mod_string += "\n".join(temp_sets) + "\n\n\n"
 
     def write_parameters(self):
@@ -137,6 +144,8 @@ class AmplProblem(amplpy.AMPL):
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
             idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
             temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit[u], t in timeSteps} default 1;"
+        if self.has_units_with_minimum_size_if_installed:
+            temp_params.append("param SIZE_MIN_IF_INSTALLED{u in unitsWithMinimumSizeIfInstalled} default 0;")
         self.mod_string += "\n".join(temp_params) + "\n\n\n"
         
     def write_variables(self):
@@ -155,6 +164,8 @@ class AmplProblem(amplpy.AMPL):
             temp_vars.append("var size{u in nonmarketUtilities} >= 0;")
             temp_vars.append("var CAPEX;")
             temp_vars.append("var TOTEX;")
+        if self.has_units_with_minimum_size_if_installed:
+            temp_vars.append("var ips{u in unitsWithMinimumSizeIfInstalled} binary;")
         self.mod_string += "\n".join(temp_vars) + "\n\n\n"
 
     def write_objective(self):
@@ -189,7 +200,10 @@ class AmplProblem(amplpy.AMPL):
         # temp_constraints.append("s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
         temp_constraints.append("s.t. purchase_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] >= 0}: 0 <= power[u,l,t] <= POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
         temp_constraints.append("s.t. selling_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] <= 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
-
+        # Constraints to be added if problem has units with a minimum size if installed
+        if self.has_units_with_minimum_size_if_installed:
+            temp_constraints.append("s.t. component_sizing_with_minimum_size_if_installed{u in unitsWithMinimumSizeIfInstalled, l in mainLayerOfUnit[u]} : size[u] >= SIZE_MIN_IF_INSTALLED[u] * ips[u] * abs(POWER_MAX[u,l]);" )
+            temp_constraints.append("s.t. constraint_on_ips{u in unitsWithMinimumSizeIfInstalled, t in timeSteps}: ics[u,t] <= ips[u];")
         # Constraints to be added depending on whether there are storage units in the problem
         if self.has_storage:
             temp_constraints.append("s.t. storage_balance{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")

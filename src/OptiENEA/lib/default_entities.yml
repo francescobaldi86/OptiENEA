@@ -5,6 +5,7 @@ SETS:
   standardUtilities:
   processes:
   storageUnits:
+  unitsWithMinimumSizeIfInstalled:
   layersOfUnit:
     - units
   mainLayerOfUnit:
@@ -20,6 +21,8 @@ PARAMETERS:
   SPECIFIC_INVESTMENT_COST_ANNUALIZED: 
     - utilities
   POWER_MIN:
+    - utilities
+  SIZE_MIN_IF_INSTALLED:
     - utilities
   CRATE:
     - storageUnits
@@ -63,4 +66,3 @@ VARIABLES:
     - storageUnits
     - layersOfUnit
     - timeSteps
-  
