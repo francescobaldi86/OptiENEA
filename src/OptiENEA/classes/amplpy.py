@@ -22,6 +22,7 @@ class AmplProblem(amplpy.AMPL):
         self.has_time_dependent_energy_prices = False
         self.has_minimum_installed_power = False
         self.has_units_with_minimum_size_if_installed = False
+        self.has_units_operated_only_on_off = False
         self.units_with_time_dependent_maximum_power = []
         self.layers_with_time_dependent_price = []
         self.problem = problem
@@ -83,8 +84,11 @@ class AmplProblem(amplpy.AMPL):
         if not self.problem.parameters['ENERGY_PRICE_VARIATION'].content.empty:
             self.has_time_dependent_energy_prices = True
         # Check if problem has units that can only be installed with a minmium size:
-        if not self.problem.parameters['SIZE_MIN_IF_INSTALLED'].content.empty:
+        if len(self.problem.sets['unitsWithMinimumSizeIfInstalled'].content) > 0:
             self.has_units_with_minimum_size_if_installed = True
+        # Check if the problem has units that can only be operated on an on/off basis
+        if len(self.problem.sets['unitsOnOff'].content) > 0:
+            self.has_units_operated_only_on_off = True
 
     def write_mod_file(self):
         self.write_sets()
@@ -117,6 +121,10 @@ class AmplProblem(amplpy.AMPL):
             idx = temp_sets.index("set utilities := standardUtilities union markets;")
             temp_sets[idx] = "set utilities := standardUtilities union markets union storageUnits;"
             temp_sets.insert(idx-1, "set storageUnits;")
+        if self.has_units_with_minimum_size_if_installed:
+            temp_sets.append("set unitsWithMinimumSizeIfInstalled within nonmarketUtilities;")
+        if self.has_units_operated_only_on_off:
+            temp_sets.append("set unitsOnOff within nonmarketUtilities;")
         self.mod_string += "\n".join(temp_sets) + "\n\n\n"
 
     def write_parameters(self):
@@ -131,6 +139,7 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
         temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
+        temp_params.append("param BIG_M default 100;")
         if self.has_minimum_installed_power:
             temp_params.append("param POWER_MIN{u in nonmarketUtilities} default 0;")
         if self.has_storage:
@@ -143,7 +152,7 @@ class AmplProblem(amplpy.AMPL):
             idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
             temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit[u], t in timeSteps} default 1;"
         if self.has_units_with_minimum_size_if_installed:
-            temp_params.append("param SIZE_MIN_IF_INSTALLED{u in nonmarketUtilities} default 0;")
+            temp_params.append("param SIZE_MIN_IF_INSTALLED{u in unitsWithMinimumSizeIfInstalled} default 0;")
         self.mod_string += "\n".join(temp_params) + "\n\n\n"
         
     def write_variables(self):
@@ -163,7 +172,9 @@ class AmplProblem(amplpy.AMPL):
             temp_vars.append("var CAPEX;")
             temp_vars.append("var TOTEX;")
         if self.has_units_with_minimum_size_if_installed:
-            temp_vars.append("var ips{u in nonmarketUtilities: SIZE_MIN_IF_INSTALLED[u] > 0} binary;")
+            temp_vars.append("var ips{u in unitsWithMinimumSizeIfInstalled} binary;")
+        if self.has_units_operated_only_on_off:
+            temp_vars.append("var ips_t{u in unitsOnOff, t in timeSteps} binary;")
         self.mod_string += "\n".join(temp_vars) + "\n\n\n"
 
     def write_objective(self):
@@ -200,8 +211,11 @@ class AmplProblem(amplpy.AMPL):
         temp_constraints.append("s.t. selling_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] <= 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
         # Constraints to be added if problem has units with a minimum size if installed
         if self.has_units_with_minimum_size_if_installed:
-            temp_constraints.append("s.t. component_sizing_with_minimum_size_if_installed{u in nonmarketUtilities, l in mainLayerOfUnit[u]: SIZE_MIN_IF_INSTALLED[u] > 0} : size[u] >= SIZE_MIN_IF_INSTALLED[u] * ips[u] * abs(POWER_MAX[u,l]);" )
-            temp_constraints.append("s.t. constraint_on_ips{u in nonmarketUtilities, t in timeSteps: SIZE_MIN_IF_INSTALLED[u] > 0}: ics[u,t] <= ips[u];")
+            temp_constraints.append("s.t. component_sizing_with_minimum_size_if_installed{u in unitsWithMinimumSizeIfInstalled, l in mainLayerOfUnit[u]} : size[u] >= SIZE_MIN_IF_INSTALLED[u] * ips[u] * abs(POWER_MAX[u,l]);" )
+            temp_constraints.append("s.t. constraint_on_ips{u in unitsWithMinimumSizeIfInstalled, t in timeSteps}: ics[u,t] <= ips[u];")
+        if self.has_units_operated_only_on_off:
+            temp_constraints.append("s.t. component_load_onoff{u in unitsOnOff, l in mainLayerOfUnit[u], t in timeSteps}: size[u] + (ips_t[u,t] - 1) * BIG_M * abs(POWER_MAX[u,l]) <= ics[u,t] * abs(POWER_MAX[u,l]);")
+            temp_constraints.append("s.t. component_load_onoff_2{u in unitsOnOff, t in timeSteps}: ics[u,t] <= ips_t[u,t];")
         # Constraints to be added depending on whether there are storage units in the problem
         if self.has_storage:
             temp_constraints.append("s.t. storage_balance{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")

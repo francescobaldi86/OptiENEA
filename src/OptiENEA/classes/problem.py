@@ -202,6 +202,10 @@ class Problem:
                         self.sets['processes'].append(unit_name)
                   if isinstance(unit, StandardUtility):
                         self.sets['standardUtilities'].append(unit_name)
+                        if unit.has_minimum_size_if_installed:
+                              self.sets['unitsWithMinimumSizeIfInstalled'].append(unit_name)
+                        if unit.can_only_be_operated_on_off:
+                              self.sets['unitsOnOff'].append(unit_name)
                   if isinstance(unit, StorageUnit):
                         self.sets['storageUnits'].append(unit_name)
                   if isinstance(unit, ChargingUnit):

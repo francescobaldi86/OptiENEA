@@ -1,0 +1,821 @@
+###snapshot-version: 0.1.5
+###data-start
+data;
+set timeSteps :=
+     0
+     1
+     2
+     3
+     4
+     5
+     6
+     7
+     8
+     9
+     10
+     11
+     12
+     13
+     14
+     15
+     16
+     17
+     18
+     19
+     20
+     21
+     22
+     23
+     24
+     25
+     26
+     27
+     28
+     29
+     30
+     31
+     32
+     33
+     34
+     35
+     36
+     37
+     38
+     39
+     40
+     41
+     42
+     43
+     44
+     45
+     46
+     47
+     48
+     49
+     50
+     51
+     52
+     53
+     54
+     55
+     56
+     57
+     58
+     59
+     60
+     61
+     62
+     63
+     64
+     65
+     66
+     67
+     68
+     69
+     70
+     71
+     72
+     73
+     74
+     75
+     76
+     77
+     78
+     79
+     80
+     81
+     82
+     83
+     84
+     85
+     86
+     87
+     88
+     89
+     90
+     91
+     92
+     93
+     94
+     95
+     96
+     97
+     98
+     99
+     100
+     101
+     102
+     103
+     104
+     105
+     106
+     107
+     108
+     109
+     110
+     111
+     112
+     113
+     114
+     115
+     116
+     117
+     118
+     119
+     120
+     121
+     122
+     123
+     124
+     125
+     126
+     127
+     128
+     129
+     130
+     131
+     132
+     133
+     134
+     135
+     136
+     137
+     138
+     139
+     140
+     141
+     142
+     143
+     144
+     145
+     146
+     147
+     148
+     149
+     150
+     151
+     152
+     153
+     154
+     155
+     156
+     157
+     158
+     159
+     160
+     161
+     162
+     163
+     164
+     165
+     166
+     167;
+set processes :=  'Household';
+set markets :=
+     'SellingMarket'
+     'PurchaseMarket';
+set storageUnits :=
+     'HotWaterStorage'
+     'Battery'
+     'BiogasStorage';
+set standardUtilities :=
+     'ElectricBoiler'
+     'HotWaterStorageCharger'
+     'CHPEngine'
+     'BiogasBoiler'
+     'BiogasStorageCharger'
+     'HeatPump'
+     'AnaerobicDigester'
+     'HotWaterStorageDischarger'
+     'BatteryCharger'
+     'PV'
+     'BatteryDischarger'
+     'BiogasStorageDischarger';
+set layers :=
+     'StoredBiogas'
+     'HotWater'
+     'DHW'
+     'StoredElectricity'
+     'Biogas'
+     'Electricity';
+ set layersOfUnit ['PV'] :=  'Electricity';
+ set layersOfUnit ['SellingMarket'] :=  'Electricity';
+ set layersOfUnit ['PurchaseMarket'] :=  'Electricity';
+ set layersOfUnit ['Household'] :=  'Electricity', 'DHW';
+ set layersOfUnit ['ElectricBoiler'] :=  'Electricity', 'DHW';
+ set layersOfUnit ['HeatPump'] :=  'Electricity', 'DHW';
+ set layersOfUnit ['HotWaterStorage'] :=  'HotWater';
+ set layersOfUnit ['Battery'] :=  'StoredElectricity';
+ set layersOfUnit ['AnaerobicDigester'] :=  'Biogas';
+ set layersOfUnit ['BiogasStorage'] :=  'StoredBiogas';
+ set layersOfUnit ['BiogasBoiler'] :=  'Biogas', 'DHW';
+ set layersOfUnit ['CHPEngine'] :=  'Biogas', 'Electricity', 'DHW';
+ set layersOfUnit ['HotWaterStorageCharger'] :=  'HotWater', 'DHW';
+ set layersOfUnit ['HotWaterStorageDischarger'] :=  'HotWater', 'DHW';
+ set layersOfUnit ['BatteryCharger'] :=  'StoredElectricity', 'Electricity';
+ set layersOfUnit ['BatteryDischarger'] :=  'StoredElectricity',
+  'Electricity';
+ set layersOfUnit ['BiogasStorageCharger'] :=  'Biogas', 'StoredBiogas';
+ set layersOfUnit ['BiogasStorageDischarger'] :=  'Biogas', 'StoredBiogas';
+ set mainLayerOfUnit ['PV'] :=  'Electricity';
+ set mainLayerOfUnit ['SellingMarket'] :=  'Electricity';
+ set mainLayerOfUnit ['PurchaseMarket'] :=  'Electricity';
+ set mainLayerOfUnit ['Household'] :=  'Electricity';
+ set mainLayerOfUnit ['ElectricBoiler'] :=  'Electricity';
+ set mainLayerOfUnit ['HeatPump'] :=  'Electricity';
+ set mainLayerOfUnit ['HotWaterStorage'] :=  'DHW';
+ set mainLayerOfUnit ['Battery'] :=  'Electricity';
+ set mainLayerOfUnit ['AnaerobicDigester'] :=  'Biogas';
+ set mainLayerOfUnit ['BiogasStorage'] :=  'Biogas';
+ set mainLayerOfUnit ['BiogasBoiler'] :=  'Biogas';
+ set mainLayerOfUnit ['CHPEngine'] :=  'Biogas';
+ set mainLayerOfUnit ['HotWaterStorageCharger'] :=  'HotWater';
+ set mainLayerOfUnit ['HotWaterStorageDischarger'] :=  'HotWater';
+ set mainLayerOfUnit ['BatteryCharger'] :=  'StoredElectricity';
+ set mainLayerOfUnit ['BatteryDischarger'] :=  'StoredElectricity';
+ set mainLayerOfUnit ['BiogasStorageCharger'] :=  'StoredBiogas';
+ set mainLayerOfUnit ['BiogasStorageDischarger'] :=  'StoredBiogas';
+ set chargingUtilitiesOfStorageUnit ['HotWaterStorage'] :=
+  'HotWaterStorageCharger';
+ set chargingUtilitiesOfStorageUnit ['Battery'] :=  'BatteryCharger';
+ set chargingUtilitiesOfStorageUnit ['BiogasStorage'] :=
+  'BiogasStorageCharger';
+ set dischargingUtilitiesOfStorageUnit ['HotWaterStorage'] :=
+  'HotWaterStorageDischarger';
+ set dischargingUtilitiesOfStorageUnit ['Battery'] :=  'BatteryDischarger';
+ set dischargingUtilitiesOfStorageUnit ['BiogasStorage'] :=
+  'BiogasStorageDischarger';
+set unitsOnOff :=  'CHPEngine';
+param POWER_MAX :=
+     ['PV','Electricity'] 0
+     ['SellingMarket','Electricity'] -10
+     ['PurchaseMarket','Electricity'] 10
+     ['ElectricBoiler','Electricity'] -10.5
+     ['ElectricBoiler','DHW'] 10
+     ['HeatPump','Electricity'] -3.5
+     ['HeatPump','DHW'] 10
+     ['AnaerobicDigester','Biogas'] 10
+     ['BiogasBoiler','Biogas'] -11
+     ['BiogasBoiler','DHW'] 10
+     ['CHPEngine','Biogas'] -10
+     ['CHPEngine','Electricity'] 2
+     ['CHPEngine','DHW'] 2
+     ['HotWaterStorageCharger','DHW'] -2
+     ['HotWaterStorageCharger','HotWater'] 1.98
+     ['HotWaterStorageDischarger','DHW'] 198
+     ['HotWaterStorageDischarger','HotWater'] -200
+     ['BatteryCharger','Electricity'] -10
+     ['BatteryCharger','StoredElectricity'] 9.399999999999999
+     ['BatteryDischarger','Electricity'] 14.399999999999999
+     ['BatteryDischarger','StoredElectricity'] -15
+     ['BiogasStorageCharger','Biogas'] -300
+     ['BiogasStorageCharger','StoredBiogas'] 297
+     ['BiogasStorageDischarger','Biogas'] 297
+     ['BiogasStorageDischarger','StoredBiogas'] -300;
+param POWER :=
+     ['Household','Electricity',0] 0.0657
+     ['Household','Electricity',1] 0.0656
+     ['Household','Electricity',2] 0.0654
+     ['Household','Electricity',3] 0.145
+     ['Household','Electricity',4] 0.0754
+     ['Household','Electricity',5] 0.1642
+     ['Household','Electricity',6] 0.6373
+     ['Household','Electricity',7] 0.9624
+     ['Household','Electricity',8] 0.6907
+     ['Household','Electricity',9] 3.4003
+     ['Household','Electricity',10] 2.8294
+     ['Household','Electricity',11] 0.7352
+     ['Household','Electricity',12] 1.235
+     ['Household','Electricity',13] 0.7686
+     ['Household','Electricity',14] 0.9328
+     ['Household','Electricity',15] 1.5375
+     ['Household','Electricity',16] 2.8705
+     ['Household','Electricity',17] 2.0808
+     ['Household','Electricity',18] 2.4213
+     ['Household','Electricity',19] 3.208
+     ['Household','Electricity',20] 0.2304
+     ['Household','Electricity',21] 0.2736
+     ['Household','Electricity',22] 0.1894
+     ['Household','Electricity',23] 0.1515
+     ['Household','Electricity',24] 0.0777
+     ['Household','Electricity',25] 0.0646
+     ['Household','Electricity',26] 0.091
+     ['Household','Electricity',27] 0.1318
+     ['Household','Electricity',28] 0.0627
+     ['Household','Electricity',29] 0.0846
+     ['Household','Electricity',30] 0.2194
+     ['Household','Electricity',31] 0.6302
+     ['Household','Electricity',32] 0.991
+     ['Household','Electricity',33] 0.5226
+     ['Household','Electricity',34] 0.3587
+     ['Household','Electricity',35] 0.447
+     ['Household','Electricity',36] 0.4023
+     ['Household','Electricity',37] 0.1778
+     ['Household','Electricity',38] 0.126
+     ['Household','Electricity',39] 0.2504
+     ['Household','Electricity',40] 0.6955
+     ['Household','Electricity',41] 0.5148
+     ['Household','Electricity',42] 0.6345
+     ['Household','Electricity',43] 0.3544
+     ['Household','Electricity',44] 0.2146
+     ['Household','Electricity',45] 0.2156
+     ['Household','Electricity',46] 0.2349
+     ['Household','Electricity',47] 0.096
+     ['Household','Electricity',48] 0.0667
+     ['Household','Electricity',49] 0.0652
+     ['Household','Electricity',50] 0.0722
+     ['Household','Electricity',51] 0.1314
+     ['Household','Electricity',52] 0.0642
+     ['Household','Electricity',53] 0.0939
+     ['Household','Electricity',54] 0.7873
+     ['Household','Electricity',55] 1.0855
+     ['Household','Electricity',56] 0.8211
+     ['Household','Electricity',57] 1.6934
+     ['Household','Electricity',58] 1.1008
+     ['Household','Electricity',59] 0.6559
+     ['Household','Electricity',60] 1.5306
+     ['Household','Electricity',61] 2.8827
+     ['Household','Electricity',62] 1.4445
+     ['Household','Electricity',63] 0.3657
+     ['Household','Electricity',64] 0.2768
+     ['Household','Electricity',65] 0.3208
+     ['Household','Electricity',66] 0.505
+     ['Household','Electricity',67] 0.4066
+     ['Household','Electricity',68] 0.2984
+     ['Household','Electricity',69] 0.2087
+     ['Household','Electricity',70] 0.1724
+     ['Household','Electricity',71] 0.0943
+     ['Household','Electricity',72] 0.065
+     ['Household','Electricity',73] 0.0577
+     ['Household','Electricity',74] 0.1102
+     ['Household','Electricity',75] 0.1067
+     ['Household','Electricity',76] 0.0673
+     ['Household','Electricity',77] 0.0952
+     ['Household','Electricity',78] 0.151
+     ['Household','Electricity',79] 0.765
+     ['Household','Electricity',80] 1.9951
+     ['Household','Electricity',81] 1.4442
+     ['Household','Electricity',82] 0.3531
+     ['Household','Electricity',83] 4.6436
+     ['Household','Electricity',84] 3.0405
+     ['Household','Electricity',85] 0.3068
+     ['Household','Electricity',86] 1.3883
+     ['Household','Electricity',87] 0.6302
+     ['Household','Electricity',88] 0.5549
+     ['Household','Electricity',89] 0.311
+     ['Household','Electricity',90] 0.8789
+     ['Household','Electricity',91] 0.6355
+     ['Household','Electricity',92] 0.2591
+     ['Household','Electricity',93] 0.1907
+     ['Household','Electricity',94] 0.2422
+     ['Household','Electricity',95] 0.0693
+     ['Household','Electricity',96] 0.0654
+     ['Household','Electricity',97] 0.0643
+     ['Household','Electricity',98] 0.0865
+     ['Household','Electricity',99] 0.1366
+     ['Household','Electricity',100] 0.0667
+     ['Household','Electricity',101] 0.0655
+     ['Household','Electricity',102] 0.742
+     ['Household','Electricity',103] 0.5015
+     ['Household','Electricity',104] 1.7093
+     ['Household','Electricity',105] 2.1324
+     ['Household','Electricity',106] 3.1755
+     ['Household','Electricity',107] 4.1075
+     ['Household','Electricity',108] 0.6658
+     ['Household','Electricity',109] 0.2091
+     ['Household','Electricity',110] 0.249
+     ['Household','Electricity',111] 0.6185
+     ['Household','Electricity',112] 0.6386
+     ['Household','Electricity',113] 0.8306
+     ['Household','Electricity',114] 0.3388
+     ['Household','Electricity',115] 2.4275
+     ['Household','Electricity',116] 3.4695
+     ['Household','Electricity',117] 0.2382
+     ['Household','Electricity',118] 0.2474
+     ['Household','Electricity',119] 0.1815
+     ['Household','Electricity',120] 0.1634
+     ['Household','Electricity',121] 0.0673
+     ['Household','Electricity',122] 0.0667
+     ['Household','Electricity',123] 0.0626
+     ['Household','Electricity',124] 0.0769
+     ['Household','Electricity',125] 0.1313
+     ['Household','Electricity',126] 0.5895
+     ['Household','Electricity',127] 0.4711
+     ['Household','Electricity',128] 1.4466
+     ['Household','Electricity',129] 1.0004
+     ['Household','Electricity',130] 0.961
+     ['Household','Electricity',131] 2.9418
+     ['Household','Electricity',132] 1.6667
+     ['Household','Electricity',133] 0.3592
+     ['Household','Electricity',134] 0.1716
+     ['Household','Electricity',135] 0.3144
+     ['Household','Electricity',136] 0.2207
+     ['Household','Electricity',137] 0.3084
+     ['Household','Electricity',138] 0.4968
+     ['Household','Electricity',139] 0.4209
+     ['Household','Electricity',140] 0.3443
+     ['Household','Electricity',141] 0.1479
+     ['Household','Electricity',142] 0.0853
+     ['Household','Electricity',143] 0.0584
+     ['Household','Electricity',144] 0.0655
+     ['Household','Electricity',145] 0.1445
+     ['Household','Electricity',146] 0.0694
+     ['Household','Electricity',147] 0.0679
+     ['Household','Electricity',148] 0.0645
+     ['Household','Electricity',149] 0.1759
+     ['Household','Electricity',150] 0.9771
+     ['Household','Electricity',151] 0.2383
+     ['Household','Electricity',152] 1.3296
+     ['Household','Electricity',153] 0.3893
+     ['Household','Electricity',154] 0.167
+     ['Household','Electricity',155] 0.1314
+     ['Household','Electricity',156] 0.064
+     ['Household','Electricity',157] 0.1096
+     ['Household','Electricity',158] 0.1869
+     ['Household','Electricity',159] 0.2536
+     ['Household','Electricity',160] 0.3183
+     ['Household','Electricity',161] 1.0362
+     ['Household','Electricity',162] 2.6423
+     ['Household','Electricity',163] 1.7927
+     ['Household','Electricity',164] 0.2229
+     ['Household','Electricity',165] 0.2894
+     ['Household','Electricity',166] 0.239
+     ['Household','Electricity',167] 0.0883
+     ['Household','DHW',0] 0
+     ['Household','DHW',1] 0
+     ['Household','DHW',2] 0
+     ['Household','DHW',3] 0
+     ['Household','DHW',4] 0
+     ['Household','DHW',5] 0.7
+     ['Household','DHW',6] 0.81
+     ['Household','DHW',7] 1.22
+     ['Household','DHW',8] 3.02
+     ['Household','DHW',9] 1.57
+     ['Household','DHW',10] 0
+     ['Household','DHW',11] 0
+     ['Household','DHW',12] 0.7
+     ['Household','DHW',13] 0
+     ['Household','DHW',14] 1.22
+     ['Household','DHW',15] 2.09
+     ['Household','DHW',16] 0
+     ['Household','DHW',17] 0.7
+     ['Household','DHW',18] 0.76
+     ['Household','DHW',19] 0.06
+     ['Household','DHW',20] 0
+     ['Household','DHW',21] 0
+     ['Household','DHW',22] 0
+     ['Household','DHW',23] 0
+     ['Household','DHW',24] 0
+     ['Household','DHW',25] 0
+     ['Household','DHW',26] 0
+     ['Household','DHW',27] 0
+     ['Household','DHW',28] 0
+     ['Household','DHW',29] 0.35
+     ['Household','DHW',30] 2.09
+     ['Household','DHW',31] 0.06
+     ['Household','DHW',32] 1.4
+     ['Household','DHW',33] 2.56
+     ['Household','DHW',34] 0.35
+     ['Household','DHW',35] 0.7
+     ['Household','DHW',36] 0.35
+     ['Household','DHW',37] 1.4
+     ['Household','DHW',38] 0
+     ['Household','DHW',39] 0.7
+     ['Household','DHW',40] 0.35
+     ['Household','DHW',41] 0
+     ['Household','DHW',42] 1.05
+     ['Household','DHW',43] 0
+     ['Household','DHW',44] 0.7
+     ['Household','DHW',45] 0
+     ['Household','DHW',46] 0
+     ['Household','DHW',47] 0
+     ['Household','DHW',48] 0
+     ['Household','DHW',49] 0
+     ['Household','DHW',50] 0
+     ['Household','DHW',51] 0
+     ['Household','DHW',52] 0
+     ['Household','DHW',53] 0.7
+     ['Household','DHW',54] 0.7
+     ['Household','DHW',55] 4.07
+     ['Household','DHW',56] 0.87
+     ['Household','DHW',57] 2.91
+     ['Household','DHW',58] 0.7
+     ['Household','DHW',59] 2.09
+     ['Household','DHW',60] 0
+     ['Household','DHW',61] 0
+     ['Household','DHW',62] 0.35
+     ['Household','DHW',63] 0
+     ['Household','DHW',64] 0.7
+     ['Household','DHW',65] 0
+     ['Household','DHW',66] 0.35
+     ['Household','DHW',67] 0
+     ['Household','DHW',68] 0.35
+     ['Household','DHW',69] 0
+     ['Household','DHW',70] 0
+     ['Household','DHW',71] 0
+     ['Household','DHW',72] 0
+     ['Household','DHW',73] 0
+     ['Household','DHW',74] 0
+     ['Household','DHW',75] 0
+     ['Household','DHW',76] 0
+     ['Household','DHW',77] 0.35
+     ['Household','DHW',78] 0
+     ['Household','DHW',79] 4.48
+     ['Household','DHW',80] 3.66
+     ['Household','DHW',81] 0.23
+     ['Household','DHW',82] 1.74
+     ['Household','DHW',83] 0
+     ['Household','DHW',84] 0
+     ['Household','DHW',85] 0
+     ['Household','DHW',86] 0.7
+     ['Household','DHW',87] 0
+     ['Household','DHW',88] 0
+     ['Household','DHW',89] 0.35
+     ['Household','DHW',90] 0.35
+     ['Household','DHW',91] 0
+     ['Household','DHW',92] 0
+     ['Household','DHW',93] 0
+     ['Household','DHW',94] 0
+     ['Household','DHW',95] 0
+     ['Household','DHW',96] 0
+     ['Household','DHW',97] 0
+     ['Household','DHW',98] 0
+     ['Household','DHW',99] 0
+     ['Household','DHW',100] 0
+     ['Household','DHW',101] 0
+     ['Household','DHW',102] 1.86
+     ['Household','DHW',103] 1.63
+     ['Household','DHW',104] 5.58
+     ['Household','DHW',105] 0.12
+     ['Household','DHW',106] 2.33
+     ['Household','DHW',107] 0
+     ['Household','DHW',108] 0
+     ['Household','DHW',109] 0
+     ['Household','DHW',110] 0
+     ['Household','DHW',111] 0
+     ['Household','DHW',112] 0
+     ['Household','DHW',113] 0.7
+     ['Household','DHW',114] 0.7
+     ['Household','DHW',115] 0.41
+     ['Household','DHW',116] 0.06
+     ['Household','DHW',117] 0
+     ['Household','DHW',118] 0
+     ['Household','DHW',119] 0
+     ['Household','DHW',120] 0
+     ['Household','DHW',121] 0
+     ['Household','DHW',122] 0
+     ['Household','DHW',123] 0
+     ['Household','DHW',124] 0
+     ['Household','DHW',125] 0
+     ['Household','DHW',126] 0.06
+     ['Household','DHW',127] 2.56
+     ['Household','DHW',128] 6.28
+     ['Household','DHW',129] 0.81
+     ['Household','DHW',130] 0.23
+     ['Household','DHW',131] 0
+     ['Household','DHW',132] 0
+     ['Household','DHW',133] 0
+     ['Household','DHW',134] 0
+     ['Household','DHW',135] 0
+     ['Household','DHW',136] 0
+     ['Household','DHW',137] 0.35
+     ['Household','DHW',138] 0.7
+     ['Household','DHW',139] 0
+     ['Household','DHW',140] 0.7
+     ['Household','DHW',141] 0
+     ['Household','DHW',142] 0
+     ['Household','DHW',143] 0
+     ['Household','DHW',144] 0
+     ['Household','DHW',145] 0
+     ['Household','DHW',146] 0
+     ['Household','DHW',147] 0
+     ['Household','DHW',148] 0
+     ['Household','DHW',149] 0.87
+     ['Household','DHW',150] 4.3
+     ['Household','DHW',151] 1.8
+     ['Household','DHW',152] 4.01
+     ['Household','DHW',153] 0
+     ['Household','DHW',154] 0
+     ['Household','DHW',155] 0
+     ['Household','DHW',156] 0
+     ['Household','DHW',157] 0
+     ['Household','DHW',158] 0
+     ['Household','DHW',159] 0
+     ['Household','DHW',160] 0
+     ['Household','DHW',161] 1.74
+     ['Household','DHW',162] 0.41
+     ['Household','DHW',163] 0.06
+     ['Household','DHW',164] 0
+     ['Household','DHW',165] 0
+     ['Household','DHW',166] 0
+     ['Household','DHW',167] 0;
+param TIME_STEP_DURATION := 1;
+param OCCURRANCE := 52;
+param SPECIFIC_INVESTMENT_COST_ANNUALIZED :=
+     ['PV'] 81.51999135963231
+     ['SellingMarket'] 0.000858105172206656
+     ['PurchaseMarket'] 0.000858105172206656
+     ['ElectricBoiler'] 1.716210344413312
+     ['HeatPump'] 115.84419824789856
+     ['HotWaterStorage'] 1.287157758309984
+     ['Battery'] 13.729682755306497
+     ['AnaerobicDigester'] 1029.7262066479873
+     ['BiogasStorage'] 1.716210344413312
+     ['BiogasBoiler'] 2.14526293051664
+     ['CHPEngine'] 85.8105172206656
+     ['HotWaterStorageCharger'] 0.000858105172206656
+     ['HotWaterStorageDischarger'] 0.000858105172206656
+     ['BatteryCharger'] 0.000858105172206656
+     ['BatteryDischarger'] 0.000858105172206656
+     ['BiogasStorageCharger'] 0.000858105172206656
+     ['BiogasStorageDischarger'] 0.000858105172206656;
+param ENERGY_AVERAGE_PRICE :=
+     ['SellingMarket','Electricity'] 0.078
+     ['PurchaseMarket','Electricity'] 0.245;
+param POWER_MAX_REL :=
+     ['PV','Electricity',0] 0
+     ['PV','Electricity',1] 0
+     ['PV','Electricity',2] 0
+     ['PV','Electricity',3] 0
+     ['PV','Electricity',4] 0
+     ['PV','Electricity',5] 0
+     ['PV','Electricity',6] 0
+     ['PV','Electricity',7] 0.10174
+     ['PV','Electricity',8] 0.22515
+     ['PV','Electricity',9] 0.29624
+     ['PV','Electricity',10] 0.14801
+     ['PV','Electricity',11] 0.11226
+     ['PV','Electricity',12] 0.14996
+     ['PV','Electricity',13] 0.11643
+     ['PV','Electricity',14] 0.0694
+     ['PV','Electricity',15] 0.05935
+     ['PV','Electricity',16] 0
+     ['PV','Electricity',17] 0
+     ['PV','Electricity',18] 0
+     ['PV','Electricity',19] 0
+     ['PV','Electricity',20] 0
+     ['PV','Electricity',21] 0
+     ['PV','Electricity',22] 0
+     ['PV','Electricity',23] 0
+     ['PV','Electricity',24] 0
+     ['PV','Electricity',25] 0
+     ['PV','Electricity',26] 0
+     ['PV','Electricity',27] 0
+     ['PV','Electricity',28] 0
+     ['PV','Electricity',29] 0
+     ['PV','Electricity',30] 0
+     ['PV','Electricity',31] 0.04864
+     ['PV','Electricity',32] 0.09689
+     ['PV','Electricity',33] 0.16133
+     ['PV','Electricity',34] 0.1202
+     ['PV','Electricity',35] 0.15646
+     ['PV','Electricity',36] 0.13673
+     ['PV','Electricity',37] 0.12908
+     ['PV','Electricity',38] 0.08605
+     ['PV','Electricity',39] 0.04231
+     ['PV','Electricity',40] 0
+     ['PV','Electricity',41] 0
+     ['PV','Electricity',42] 0
+     ['PV','Electricity',43] 0
+     ['PV','Electricity',44] 0
+     ['PV','Electricity',45] 0
+     ['PV','Electricity',46] 0
+     ['PV','Electricity',47] 0
+     ['PV','Electricity',48] 0
+     ['PV','Electricity',49] 0
+     ['PV','Electricity',50] 0
+     ['PV','Electricity',51] 0
+     ['PV','Electricity',52] 0
+     ['PV','Electricity',53] 0
+     ['PV','Electricity',54] 0
+     ['PV','Electricity',55] 0.04512
+     ['PV','Electricity',56] 0.09358
+     ['PV','Electricity',57] 0.13173
+     ['PV','Electricity',58] 0.12993
+     ['PV','Electricity',59] 0.14211
+     ['PV','Electricity',60] 0.21663
+     ['PV','Electricity',61] 0.12691
+     ['PV','Electricity',62] 0.05729
+     ['PV','Electricity',63] 0.08475
+     ['PV','Electricity',64] 0
+     ['PV','Electricity',65] 0
+     ['PV','Electricity',66] 0
+     ['PV','Electricity',67] 0
+     ['PV','Electricity',68] 0
+     ['PV','Electricity',69] 0
+     ['PV','Electricity',70] 0
+     ['PV','Electricity',71] 0
+     ['PV','Electricity',72] 0
+     ['PV','Electricity',73] 0
+     ['PV','Electricity',74] 0
+     ['PV','Electricity',75] 0
+     ['PV','Electricity',76] 0
+     ['PV','Electricity',77] 0
+     ['PV','Electricity',78] 0
+     ['PV','Electricity',79] 0.19789
+     ['PV','Electricity',80] 0.41787
+     ['PV','Electricity',81] 0.59916
+     ['PV','Electricity',82] 0.70617
+     ['PV','Electricity',83] 0.74216
+     ['PV','Electricity',84] 0.74281
+     ['PV','Electricity',85] 0.65147
+     ['PV','Electricity',86] 0.48769
+     ['PV','Electricity',87] 0.25828
+     ['PV','Electricity',88] 0
+     ['PV','Electricity',89] 0
+     ['PV','Electricity',90] 0
+     ['PV','Electricity',91] 0
+     ['PV','Electricity',92] 0
+     ['PV','Electricity',93] 0
+     ['PV','Electricity',94] 0
+     ['PV','Electricity',95] 0
+     ['PV','Electricity',96] 0
+     ['PV','Electricity',97] 0
+     ['PV','Electricity',98] 0
+     ['PV','Electricity',99] 0
+     ['PV','Electricity',100] 0
+     ['PV','Electricity',101] 0
+     ['PV','Electricity',102] 0
+     ['PV','Electricity',103] 0.20204
+     ['PV','Electricity',104] 0.44292
+     ['PV','Electricity',105] 0.61819
+     ['PV','Electricity',106] 0.71647
+     ['PV','Electricity',107] 0.76174
+     ['PV','Electricity',108] 0.76067
+     ['PV','Electricity',109] 0.66108
+     ['PV','Electricity',110] 0.48709
+     ['PV','Electricity',111] 0.26384
+     ['PV','Electricity',112] 0
+     ['PV','Electricity',113] 0
+     ['PV','Electricity',114] 0
+     ['PV','Electricity',115] 0
+     ['PV','Electricity',116] 0
+     ['PV','Electricity',117] 0
+     ['PV','Electricity',118] 0
+     ['PV','Electricity',119] 0
+     ['PV','Electricity',120] 0
+     ['PV','Electricity',121] 0
+     ['PV','Electricity',122] 0
+     ['PV','Electricity',123] 0
+     ['PV','Electricity',124] 0
+     ['PV','Electricity',125] 0
+     ['PV','Electricity',126] 0
+     ['PV','Electricity',127] 0.00298
+     ['PV','Electricity',128] 0.07587
+     ['PV','Electricity',129] 0.54818
+     ['PV','Electricity',130] 0.57619
+     ['PV','Electricity',131] 0.04698
+     ['PV','Electricity',132] 0.09201
+     ['PV','Electricity',133] 0.29145
+     ['PV','Electricity',134] 0.05979
+     ['PV','Electricity',135] 0.02201
+     ['PV','Electricity',136] 0
+     ['PV','Electricity',137] 0
+     ['PV','Electricity',138] 0
+     ['PV','Electricity',139] 0
+     ['PV','Electricity',140] 0
+     ['PV','Electricity',141] 0
+     ['PV','Electricity',142] 0
+     ['PV','Electricity',143] 0
+     ['PV','Electricity',144] 0
+     ['PV','Electricity',145] 0
+     ['PV','Electricity',146] 0
+     ['PV','Electricity',147] 0
+     ['PV','Electricity',148] 0
+     ['PV','Electricity',149] 0
+     ['PV','Electricity',150] 0
+     ['PV','Electricity',151] 0.16653
+     ['PV','Electricity',152] 0.23423
+     ['PV','Electricity',153] 0.18073
+     ['PV','Electricity',154] 0.32267
+     ['PV','Electricity',155] 0.262
+     ['PV','Electricity',156] 0.25794
+     ['PV','Electricity',157] 0.19791
+     ['PV','Electricity',158] 0.20984
+     ['PV','Electricity',159] 0.20335
+     ['PV','Electricity',160] 0
+     ['PV','Electricity',161] 0
+     ['PV','Electricity',162] 0
+     ['PV','Electricity',163] 0
+     ['PV','Electricity',164] 0
+     ['PV','Electricity',165] 0
+     ['PV','Electricity',166] 0
+     ['PV','Electricity',167] 0;
+param POWER_MIN :=
+     ['AnaerobicDigester'] 5
+     ['CHPEngine'] 1;
+param ENERGY_MAX :=
+     ['HotWaterStorage'] 20
+     ['Battery'] 10
+     ['BiogasStorage'] 30;
+param CRATE :=
+     ['HotWaterStorage'] 0.1
+     ['Battery'] 1
+     ['BiogasStorage'] 10;
+param ERATE :=
+     ['HotWaterStorage'] 10
+     ['Battery'] 1.5
+     ['BiogasStorage'] 10;
+model;
+###data-end
+

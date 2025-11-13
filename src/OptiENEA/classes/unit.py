@@ -138,6 +138,7 @@ class Utility(Unit):
     has_time_dependent_max_power: bool
     has_minimum_installed_power: bool
     has_minimum_size_if_installed: bool
+    can_only_be_operated_on_off: bool
     
     def __init__(self, name, info, problem):
         super().__init__(name, info, problem)
@@ -150,6 +151,7 @@ class Utility(Unit):
         self.minimum_size_if_installed = self.info['Min size if installed']
         self.has_minimum_installed_power = True if self.minimum_installed_power > 0 else False
         self.has_minimum_size_if_installed = True if self.minimum_size_if_installed > 0 else False
+        self.can_only_be_operated_on_off = self.info['OnOff utility']
         self.max_installed_power = {l: 0 for l in self.layers}
         self.time_dependent_capacity_factor = {l: None for l in self.layers}
         self.calculate_annualized_capex(self.problem.interest_rate)
