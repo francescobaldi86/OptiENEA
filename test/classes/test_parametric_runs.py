@@ -45,8 +45,8 @@ def test_write_parametric_data_results(empty_problem):
     assert math.isclose(test_output.loc[3, ('Output', 'CAPEX')], 19, abs_tol=1)
 
 @pytest.fixture
-def empty_problem():
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', 'test_parametric_runs')
+def empty_problem(tmp_path):
+    problem_folder = os.path.join(tmp_path, 'test_parametric_runs')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
@@ -56,5 +56,3 @@ def empty_problem():
     problem = Problem(name = 'test_problem', 
                       problem_folder = problem_folder)
     yield problem
-    # Then we clean up
-    shutil.rmtree(problem_folder)

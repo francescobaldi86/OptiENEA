@@ -13,9 +13,9 @@ def test_problem_main_settings_default():
     assert problem.interest_rate == 0.06
     assert problem.simulation_horizon == 8760
 
-def test_read_problem_main_settings_from_file():
+def test_read_problem_main_settings_from_file(tmp_path):
     # Tries reading the data from some example files
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', 'test_problem_parameter')
+    problem_folder = os.path.join(tmp_path, 'test_problem_parameter')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
@@ -30,4 +30,3 @@ def test_read_problem_main_settings_from_file():
     assert problem.solver == 'highs'
     assert problem.interest_rate == 0.07
     assert problem.simulation_horizon == 168
-    shutil.rmtree(problem_folder)

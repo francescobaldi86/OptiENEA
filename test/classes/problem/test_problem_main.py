@@ -18,7 +18,7 @@ def test_create_empty_problem():
     assert isinstance(problem.parameters['POWER'], Parameter)
 
 
-def test_create_problem_folders():
+def test_create_problem_folders(tmp_path):
     # Once the problem has been created, it tests the creation of the related folders
     os.mkdir(os.path.join(__PARENT__,'PLAYGROUND','test_problem_main'))  
     problem = Problem(name = 'test_problem_main', 
@@ -120,8 +120,8 @@ def test_write_problem_output(solved_problem):
 
 
 @pytest.fixture
-def problem_base():
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', 'test_problem_main')
+def problem_base(tmp_path):
+    problem_folder = os.path.join(tmp_path, 'test_problem_main')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
@@ -134,8 +134,6 @@ def problem_base():
     problem.create_folders()
     # Problem setup this way is what we want to give to tests
     yield problem
-    # Then we clean up
-    shutil.rmtree(problem_folder)
 
 
 

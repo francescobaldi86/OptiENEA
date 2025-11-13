@@ -9,8 +9,8 @@ __HERE__ = os.path.dirname(os.path.realpath(__file__))
 __PARENT__ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 
-def test_problem_with_min_installed_power():
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', f'test_problem_minimum_capacity')
+def test_problem_with_min_installed_power(tmp_path):
+    problem_folder = os.path.join(tmp_path, f'test_problem_minimum_capacity')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
@@ -35,10 +35,9 @@ def test_problem_with_min_installed_power():
                       problem_folder = problem_folder)
     problem.run()
     assert math.isclose(problem.ampl_problem.get_variable('size')['CHPEngine'].value(),4,abs_tol = 0.1)
-    shutil.rmtree(problem_folder)
 
-def test_problem_with_min_installed_power_if_installed():
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', f'test_problem_minimum_size_if_installed')
+def test_problem_with_min_installed_power_if_installed(tmp_path):
+    problem_folder = os.path.join(tmp_path, f'test_problem_minimum_size_if_installed')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
@@ -69,10 +68,9 @@ def test_problem_with_min_installed_power_if_installed():
                       problem_folder = problem_folder)
     problem.run()
     assert math.isclose(problem.ampl_problem.get_variable('size')['AnaerobicDigester'].value(),0.0,abs_tol = 0.01)
-    shutil.rmtree(problem_folder)
 
-def test_problem_with_on_off_units():
-    problem_folder = os.path.join(__PARENT__, 'PLAYGROUND', f'test_problem_onoff_unit')
+def test_problem_with_on_off_units(tmp_path):
+    problem_folder = os.path.join(tmp_path, f'test_problem_onoff_unit')
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
@@ -109,4 +107,3 @@ def test_problem_with_on_off_units():
     assert math.isclose(min([problem.ampl_problem.get_variable('ics')['CHPEngine', x].value() for x in range(168) if problem.ampl_problem.get_variable('ics')['CHPEngine', x].value() > 0.001]),
                         max([problem.ampl_problem.get_variable('ics')['CHPEngine', x].value() for x in range(168) if problem.ampl_problem.get_variable('ics')['CHPEngine', x].value() > 0.001]),
                         abs_tol = 0.01)
-    shutil.rmtree(problem_folder)
