@@ -10,17 +10,20 @@ def test_read_parametric_problem_data(empty_problem):
     parametric_runs = ParametricRuns('test', empty_problem)
     assert parametric_runs.name == 'test'
     assert parametric_runs.problem == empty_problem
-    assert parametric_runs.problem_folder == empty_problem.problem_folder
     assert parametric_runs.filename_scenario_description == 'Scenarios.xlsx'
     # Checking data about scenarios
-    assert parametric_runs.scenarios_description.loc[0, ('Problem', 'POWER_MAX', 'PV', 'Electricity')] == 100
-    assert pd.isna(parametric_runs.scenarios_description.loc[1, ('Problem', 'POWER_MAX', 'PV', 'Electricity')])
-    assert parametric_runs.scenarios_description.loc[2, ('Problem', 'OCCURRANCE', '-','-')] == 2
-    assert pd.isna(parametric_runs.scenarios_description.loc[1, ('Problem', 'OCCURRANCE', '-','-')])
-    assert parametric_runs.scenarios_description.loc[1, ('Problem', 'POWER_MIN', 'AnaerobicDigester','-')] == 1
-    assert pd.isna(parametric_runs.scenarios_description.loc[0, ('Problem', 'POWER_MIN', 'AnaerobicDigester','-')])
-    assert parametric_runs.scenarios_description.loc[2, ('units.yaml', 'HeatPump', 'Specific CAPEX','-')] == 500
-    assert pd.isna(parametric_runs.scenarios_description.loc[1, ('units.yaml', 'HeatPump', 'Specific CAPEX','-')])
+    assert parametric_runs.scenarios_description.loc[0, ('Problem', 'POWER_MAX', 'PV', 'Electricity')] == 20.0
+    assert parametric_runs.scenarios_description.loc[1, ('Problem', 'POWER_MAX', 'PV', 'Electricity')] == 100.0
+    assert parametric_runs.scenarios_description.loc[2, ('Problem', 'POWER_MAX', 'PV', 'Electricity')] == 20.0
+    assert parametric_runs.scenarios_description.loc[0, ('Problem', 'OCCURRANCE', '-','-')] == 1
+    assert parametric_runs.scenarios_description.loc[1, ('Problem', 'OCCURRANCE', '-','-')] == 1
+    assert parametric_runs.scenarios_description.loc[3, ('Problem', 'OCCURRANCE', '-','-')] == 2
+    assert parametric_runs.scenarios_description.loc[0, ('Problem', 'ENERGY_AVERAGE_PRICE', 'PurchaseMarket','-')] == 0.245
+    assert parametric_runs.scenarios_description.loc[1, ('Problem', 'ENERGY_AVERAGE_PRICE', 'PurchaseMarket','-')] == 0.35
+    assert parametric_runs.scenarios_description.loc[2, ('Problem', 'ENERGY_AVERAGE_PRICE', 'PurchaseMarket','-')] == 0.245
+    assert parametric_runs.scenarios_description.loc[0, ('units.yml', 'HeatPump', 'Specific CAPEX','-')] == 1350
+    assert parametric_runs.scenarios_description.loc[1, ('units.yml', 'HeatPump', 'Specific CAPEX','-')] == 1350
+    assert parametric_runs.scenarios_description.loc[3, ('units.yml', 'HeatPump', 'Specific CAPEX','-')] == 500
     # Checking data about KPIs
     assert parametric_runs.kpis.loc[0, 'Name'] == 'TOTEX'
     assert parametric_runs.kpis.loc[3, 'Indexing'] == 'PV'  
@@ -31,7 +34,7 @@ def test_write_parametric_data_results(empty_problem):
     parametric_runs.run()
     parametric_runs.generate_summary_output_file()
     test_output = pd.read_excel(
-        os.path.join(parametric_runs.problem_folder, f'{parametric_runs.name}_parametric_results.xlsx'),
+        os.path.join(parametric_runs.problem.problem_folder, 'Parametric run test', f'{parametric_runs.name}_parametric_results.xlsx'),
         skiprows=[2],
         header = [0,1],
         index_col = 0
