@@ -120,6 +120,8 @@ class Process(Unit):
                         self.has_time_dependent_power = True
                     else:
                         raise ValueError(f'The power input for unit {self.name} should be a list of either single values or the string "file"')
+            else:
+                raise(BaseException, f'The unit {self.name} has a problem with the input data. The list that defines the layers has {len(self.layers)} values, while the list with the power values has {len(self.info['Power'])} values. They should be equal in length')
         else:
             raise ValueError(f'The unit {self.name} has more than one layer, so the power input must be a list')
                 
@@ -179,19 +181,19 @@ class Utility(Unit):
 
     def read_time_dependent_capacity_factor(self):
         if self.ts_data is not None:
-            if "Capacity factor" in self.ts_data.columns.levels[0]:
+            if "Capacity factor" in [column[0] for column in self.ts_data.columns]:
                 self.time_dependent_capacity_factor = {}
-                if 'All layers' in self.ts_data.columns.levels[1] and len(self.ts_data.loc[:, ('Capacity factor')] == 1):
+                if 'All layers' in [column[1] for column in self.ts_data.columns] and len(self.ts_data.loc[:, ('Capacity factor')] == 1):
                     for layer in self.layers:
                         self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', 'All layers')]
-                elif 'All layers' not in self.ts_data.columns.levels[1]:
+                elif 'All layers' not in [column[1] for column in self.ts_data.columns]:
                     for layer in self.layers:
-                        if layer in self.ts_data.columns.levels[1]:
+                        if layer in [column[1] for column in self.ts_data.columns]:
                             self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', layer)]
                         else:
                             self.time_dependent_capacity_factor[layer] = None
                 else:
-                    raise(KeyError, f'Something is wrong with the data provided for the time-dependent capacity factor of unit {self.name}. There should be either one column per unit layer, or one single column with key "All layers" for the layer')
+                    raise(BaseException, f'Something is wrong with the data provided for the time-dependent capacity factor of unit {self.name}. There should be either one column per unit layer, or one single column with key "All layers" for the layer')
 
     @staticmethod
     def calculate_annualization_factor(lifetime, interest_rate):
