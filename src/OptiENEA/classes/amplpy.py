@@ -40,34 +40,13 @@ class AmplProblem(amplpy.AMPL):
             else:
                 self.set[s.name] = list(s.content)
 
-    def parse_problem_settings_backup(self):
-        for _, unit in self.problem.units.items():
-            if isinstance(unit, ut.Process):
-                if unit.has_time_dependent_power:
-                    self.has_time_dependent_power = True
-            if isinstance(unit, ut.Utility):
-                if unit.specific_capex >= 1:
-                    self.has_capex = True
-                if unit.has_minimum_installed_power:
-                    self.has_minimum_installed_power = True
-                if isinstance(unit, ut.StandardUtility):
-                    if unit.has_time_dependent_max_power:
-                        self.has_time_dependent_max_power = True
-                elif isinstance(unit, ut.StorageUnit):
-                    self.has_storage = True
-                elif isinstance(unit, ut.Market):
-                    if unit.has_time_dependent_energy_prices:
-                        self.has_time_dependent_energy_prices = True
-
     def parse_problem_settings(self):
         # Check if problem has time-dependent power input
-        for process in self.problem.sets['processes'].content:
-            for layer in self.problem.sets['layersOfUnit'].content[process]:
-                if len(self.problem.parameters['POWER'].content.loc[(process, layer, ), 'POWER']) == self.problem.simulation_horizon:
-                    self.has_time_dependent_power = True
-                    break
+        for _, unit in self.problem.units.items():
+            if unit.has_time_dependent_power:
+                self.has_time_dependent_power = True
             if self.has_time_dependent_power:
-                break        
+                break
         # Check if problem has capex
         if not self.problem.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].content.empty:
             self.has_capex = True

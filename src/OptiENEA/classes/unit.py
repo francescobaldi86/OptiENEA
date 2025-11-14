@@ -137,14 +137,14 @@ class Utility(Unit):
     specific_opex: float
     max_installed_power: dict
     time_dependent_capacity_factor: pd.Series | None
-    has_time_dependent_max_power: bool
+    has_time_dependent_power: bool
     has_minimum_installed_power: bool
     has_minimum_size_if_installed: bool
     can_only_be_operated_on_off: bool
     
     def __init__(self, name, info, problem):
         super().__init__(name, info, problem)
-        self.has_time_dependent_max_power = False
+        self.has_time_dependent_power = False
         self.check_default_values('Utility')
         self.specific_capex = self.info['Specific CAPEX']
         self.specific_opex = self.info['Specific OPEX']
@@ -183,6 +183,7 @@ class Utility(Unit):
         if self.ts_data is not None:
             if "Capacity factor" in [column[0] for column in self.ts_data.columns]:
                 self.time_dependent_capacity_factor = {}
+                self.has_time_dependent_power = True
                 if 'All layers' in [column[1] for column in self.ts_data.columns] and len(self.ts_data.loc[:, ('Capacity factor')] == 1):
                     for layer in self.layers:
                         self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', 'All layers')]
