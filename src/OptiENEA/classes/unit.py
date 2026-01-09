@@ -258,7 +258,7 @@ class StorageUnit(Utility):
     @staticmethod
     def storage_layer_name(storage_unit_info):
         storage_unit_info['Stored energy layer'] = storage_unit_info['Stored energy layer'] if 'Stored energy layer' in storage_unit_info.keys() else None
-        return storage_unit_info['Stored energy layer'] if storage_unit_info['Stored energy layer'] else f'Stored{safe_to_list(storage_unit_info['Layers'])[0]}'
+        return storage_unit_info['Stored energy layer'] if storage_unit_info['Stored energy layer'] else f'Stored{safe_to_list(storage_unit_info["Layers"])[0]}'
 
 class ChargingUnit(Utility):
     efficiency: float 
@@ -363,7 +363,7 @@ class Market(Utility):
                     self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
                     self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]
                 else:
-                    raise ValueError(f'The "Price" should be a list of float or include the "file" value. {self.info['Price']} was provided for unit {self.name}')
+                    raise ValueError(f'The "Price" should be a list of float or include the "file" value. {self.info["Price"]} was provided for unit {self.name}')
 
     def check_data_consistency(self):
         assert len(self.layers) == len(self.activation_frequency)
