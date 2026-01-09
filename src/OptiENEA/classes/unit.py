@@ -234,7 +234,7 @@ class StorageUnit(Utility):
         aux_unit_info = storage_unit_info[f'{aux_type} unit info']
         stored_energy_layer = StorageUnit.storage_layer_name(storage_unit_info)
         output = {}
-        output['Name'] = aux_unit_info['Name'] if 'Name' in aux_unit_info.keys() else f'{storage_unit_name}{aux_type.replace('ing','er')}'
+        output['Name'] = aux_unit_info['Name'] if 'Name' in aux_unit_info.keys() else f'{storage_unit_name}{aux_type.replace("ing","er")}'
         storage_unit_layers = safe_to_list(storage_unit_info['Layers'])
         output['Layers'] = [l for l in storage_unit_layers]
         if stored_energy_layer not in output['Layers']:
