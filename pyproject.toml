@@ -39,6 +39,9 @@ testpaths = [
     "test",
 ]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
 include = ["OptiENEA*"]
 
