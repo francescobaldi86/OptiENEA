@@ -66,6 +66,7 @@ class Problem:
             self.raw_timeseries_data = pd.DataFrame()
             self.raw_general_data = {}
             self.raw_unit_data = {}
+            self.additional_constraints_data = {}
 
       def load_problem_data():
             """
@@ -114,6 +115,8 @@ class Problem:
                   self.raw_unit_data = yaml.safe_load(stream)
             with open(os.path.join(self.input_folder, 'general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
+            with open(os.path.join(self.input_folder, 'constraints.yml'), 'r') as stream:
+                  self.additional_constraints_data = yaml.safe_load(stream)
             try:
                   self.raw_timeseries_data = pd.read_csv(
                         os.path.join(self.input_folder, 'timeseries_data.csv'), 
@@ -265,6 +268,10 @@ class Problem:
                                           self.parameters['ENERGY_PRICE_VARIATION'].list_content.append(temp)
                   else:
                         raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
+            # Adding parameters defined in additional constraints      
+            for constraint_type, constraint in self.additional_constraints_data.items():
+                  self.parameters[constraint['parameter name']] = Parameter(constraint['parameter name'], None)
+                  self.parameters[constraint['parameter name']].content = constraint['parameter value']
             # Finally doing the conversion from lists to Dataframes
             for param_name, parameter in self.parameters.items():
                   if parameter.indexing_level > 0 and parameter.list_content != []:

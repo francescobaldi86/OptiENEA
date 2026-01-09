@@ -74,7 +74,8 @@ class AmplProblem(amplpy.AMPL):
         self.write_parameters()
         self.write_variables()
         self.write_objective()
-        self.write_constraints()
+        self.write_base_constraints()
+        self.write_additional_constraints()
         self.eval(self.mod_string)
 
     def write_sets(self):
@@ -165,7 +166,7 @@ class AmplProblem(amplpy.AMPL):
         self.mod_string += "\n\n"
 
 
-    def write_constraints(self):
+    def write_base_constraints(self):
         # Adds the problem constraints to the mod file string
         temp_constraints = []
         temp_constraints.append("/* CONSTRAINTS */\n")
@@ -223,7 +224,16 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. discharging_power_only_negative{u in storageUnits, l in layersOfUnit[u], dis in dischargingUtilitiesOfStorageUnit[u], t in timeSteps}:")
             temp_constraints.append("\tpower[dis,l,t] <= 0;")
         self.mod_string += "\n".join(temp_constraints) + "\n\n\n"
-        
+
+    def write_additional_constraints(self):
+        additional_constraints = []
+        for constraint_type, constraint in self.problem.additional_constraints_data.items():
+            additional_constraints.append(f"param {constraint['parameter name']};")
+            additional_constraints.append(f"s.t. {constraint['name']}")
+            additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
+            additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) <= {constraint['parameter name']};")
+        self.mod_string += "\n".join(additional_constraints) + "\n\n\n"
+
     def write_sets_to_amplpy(self):
         # Writes problem data about sets to amplpy
         for name, problem_set in self.problem.sets.items():
