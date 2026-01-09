@@ -121,7 +121,7 @@ class Process(Unit):
                     else:
                         raise ValueError(f'The power input for unit {self.name} should be a list of either single values or the string "file"')
             else:
-                raise ValueError(f'The unit {self.name} has a problem with the input data. The list that defines the layers has {len(self.layers)} values, while the list with the power values has {len(self.info['Power'])} values. They should be equal in length')
+                raise ValueError(f'The unit {self.name} has a problem with the input data. The list that defines the layers has {len(self.layers)} values, while the list with the power values has {len(self.info["Power"])} values. They should be equal in length')
         else:
             raise ValueError(f'The unit {self.name} has more than one layer, so the power input must be a list')
                 
