@@ -53,6 +53,7 @@ class ParametricRuns():
 
     def run(self):
         # Runs the scenarios loaded
+        print(f'Start running parametric test "{self.name}"')
         self.create_folders()
         parameters_to_update = self.check_parameters_to_update()
         
@@ -77,7 +78,9 @@ class ParametricRuns():
             run_name = f'Scenario {scenario} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
             self.scenarios_description.loc[scenario, ('Run name','-','-','-')] = run_name
             problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
+            print(f'Starting solving problem {problem.name} in scenario # {scenario}')
             problem.solve_ampl_problem()  # Solves the optimization problem
+            print('Solution completed!')
             problem.save_output()  # Saves the output into useful and readable data structures
         self.generate_summary_output_file()
 
