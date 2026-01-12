@@ -20,7 +20,7 @@ class ParametricRuns():
 
     def __init__(self, name: str, problem: Problem, filename_scenarios: str = 'Scenarios.xlsx'):
         self.name = name
-        self.run_name = name + " " datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")
+        self.run_name = name + " " + datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")
         self.problem = problem
         self.filename_scenario_description = filename_scenarios
         self.parametric_runs_results_folder = os.path.join(self.problem.problem_folder, 'Results', self.run_name)
@@ -148,7 +148,7 @@ class ParametricRuns():
 
     def read_optimization_output_files(self, run_name, scenario):
         if run_name == 'temp':
-            file_list = [f for f in os.listdir(os.path.join(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
+            file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(self.parametric_runs_results_folder, f)]
             flie_list = [f for f in file_list if f'Scenario {scenario}' in f]
             if len(file_list) > 0:
                 file_name = file_list[0]
