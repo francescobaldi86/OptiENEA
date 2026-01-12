@@ -20,9 +20,11 @@ class ParametricRuns():
 
     def __init__(self, name: str, problem: Problem, filename_scenarios: str = 'Scenarios.xlsx'):
         self.name = name
+        self.run_name = name + " " datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")
         self.problem = problem
         self.filename_scenario_description = filename_scenarios
-        self.parametric_runs_folder = os.path.join(self.problem.problem_folder, f'Parametric run {self.name}')
+        self.parametric_runs_results_folder = os.path.join(self.problem.problem_folder, 'Results', self.run_name)
+        self.parametric_runs_temp_folder = os.path.join(self.problem.problem_folder, 'Temporary files', self.run_name)
         self.load_scenario_file()
 
     def load_scenario_file(self):
@@ -58,8 +60,8 @@ class ParametricRuns():
             problem = Problem(
                 name = self.problem.name, 
                 problem_folder = self.problem.problem_folder,
-                temp_folder = os.path.join(self.parametric_runs_folder, 'Temporary files'),
-                results_folder = os.path.join(self.parametric_runs_folder, 'Results')
+                temp_folder = os.path.join(self.parametric_runs_temp_folder),
+                results_folder = os.path.join(self.parametric_runs_results_folder)
                 )
             validate_project_structure(problem.problem_folder)
             problem.create_folders()  # Creates the project folders
@@ -81,7 +83,8 @@ class ParametricRuns():
 
     def create_folders(self):
         try:
-            os.mkdir(self.parametric_runs_folder)
+            os.mkdir(self.parametric_runs_results_folder)
+            os.mkdir(self.parametric_runs_temp_folder)
         except FileExistsError:
             pass
 
@@ -99,11 +102,12 @@ class ParametricRuns():
         temp_kpi = pd.DataFrame(index = self.output.index, columns = pd.MultiIndex.from_tuples(kpi_columns))
         for scenario in self.scenarios_description.index:
             temp_output_kpis, temp_output_units = self.read_optimization_output_files(self.output.loc[scenario, ('Input','Run name:::')], scenario)
-            for kpi in kpi_columns:
-                if len(kpi[1].split(':')) == 1:
-                    temp_kpi.loc[scenario, kpi] = temp_output_kpis.loc[kpi[1]].Value
-                else:
-                    temp_kpi.loc[scenario, kpi] = temp_output_units.loc[kpi[1].split(':')[1], kpi[1].split(':')[0]]
+            if (temp_output_kpis is not None) and (temp_output_units is not None):
+                for kpi in kpi_columns:
+                    if len(kpi[1].split(':')) == 1:
+                        temp_kpi.loc[scenario, kpi] = temp_output_kpis.loc[kpi[1]].Value
+                    else:
+                        temp_kpi.loc[scenario, kpi] = temp_output_units.loc[kpi[1].split(':')[1], kpi[1].split(':')[0]]
         self.output = self.output.combine_first(temp_kpi)
         self.output.to_excel(os.path.join(self.parametric_runs_folder, f'{self.name}_parametric_results.xlsx'))
 
@@ -144,18 +148,22 @@ class ParametricRuns():
 
     def read_optimization_output_files(self, run_name, scenario):
         if run_name == 'temp':
-            file_list = [f for f in os.listdir(os.path.join(self.parametric_runs_folder, 'Results')) if os.path.isfile(os.path.join(self.parametric_runs_folder, 'Results', f))]
-            file_name = [f for f in file_list if f'Scenario {scenario}' in f][0]
+            file_list = [f for f in os.listdir(os.path.join(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
+            flie_list = [f for f in file_list if f'Scenario {scenario}' in f]
+            if len(file_list) > 0:
+                file_name = file_list[0]
+            else:
+                return None, None  # In case no result file was generated
         else:
             file_name = f'Results_{run_name}.xlsx'
         kpis = pd.read_excel(
-            os.path.join(self.parametric_runs_folder, "Results", file_name),
+            os.path.join(self.parametric_runs_results_folder, file_name),
             'kpis',
             header = 0, 
             index_col = 0,
         )
         units = pd.read_excel(
-            os.path.join(self.parametric_runs_folder, "Results", file_name),
+            os.path.join(self.parametric_runs_results_folder, file_name),
             'units',
             header = 0, 
             index_col = 0,
