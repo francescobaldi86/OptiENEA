@@ -191,11 +191,10 @@ class AmplProblem(amplpy.AMPL):
         temp_constraints.append("s.t. selling_market_limits{u in markets, l in layersOfUnit[u], t in timeSteps: POWER_MAX[u,l] <= 0}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
         # Constraints to be added if problem has units with a minimum size if installed
         if self.has_units_with_minimum_size_if_installed:
-            temp_constraints.append("s.t. component_sizing_with_minimum_size_if_installed{u in unitsWithMinimumSizeIfInstalled, l in mainLayerOfUnit[u]} : size[u] >= SIZE_MIN_IF_INSTALLED[u] * ips[u] * abs(POWER_MAX[u,l]);" )
+            temp_constraints.append("s.t. component_sizing_with_minimum_size_if_installed{u in unitsWithMinimumSizeIfInstalled, l in mainLayerOfUnit[u]} : size[u] >= SIZE_MIN_IF_INSTALLED[u] * ips[u];")
             temp_constraints.append("s.t. constraint_on_ips{u in unitsWithMinimumSizeIfInstalled, t in timeSteps}: ics[u,t] <= ips[u];")
         if self.has_units_operated_only_on_off:
-            temp_constraints.append("s.t. component_load_onoff{u in unitsOnOff, l in mainLayerOfUnit[u], t in timeSteps}: size[u] + (ips_t[u,t] - 1) * BIG_M * abs(POWER_MAX[u,l]) <= ics[u,t] * abs(POWER_MAX[u,l]);")
-            temp_constraints.append("s.t. component_load_onoff_2{u in unitsOnOff, t in timeSteps}: ics[u,t] <= ips_t[u,t];")
+            temp_constraints.append("s.t. component_load_onoff{u in unitsOnOff, t in timeSteps}: ics[u,t] == ips_t[u,t];")
         # Constraints to be added depending on whether there are storage units in the problem
         if self.has_storage:
             temp_constraints.append("s.t. storage_balance{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
