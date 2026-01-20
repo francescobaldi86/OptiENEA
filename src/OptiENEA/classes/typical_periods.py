@@ -104,8 +104,7 @@ class PeriodSegmenter:
           period_index: index identifying each period (e.g., each date / week start)
         """
         if not isinstance(series.index, pd.DatetimeIndex):
-            series.index = pd.to_datetime('2023-01-01 00:00') + pd.Timedelta(series.index.values)
-            raise TypeError("series must have a DatetimeIndex.")
+            series.index = pd.date_range(start = pd.to_datetime('2023-01-01 00:00'), periods=len(series.index.values), freq = 'H')
 
         s = series.sort_index()
         if not self.tz_aware_ok and s.index.tz is not None:
@@ -135,24 +134,26 @@ class MultiSeriesSegmenter:
     def __init__(self, segmenter: PeriodSegmenter):
         self.segmenter = segmenter
 
-    def segment(self, data: Dict[str, pd.Series]) -> Tuple[Dict[str, np.ndarray], pd.Index]:
-        if not data:
-            raise ValueError("data is empty")
-        # check aligned indices
-        first = next(iter(data.values()))
-        idx0 = first.index
-        for k, s in data.items():
-            if not s.index.equals(idx0):
-                raise ValueError(f"Series '{k}' index does not match others.")
-        out: Dict[str, np.ndarray] = {}
-        period_index = None
-        for name, s in data.items():
+    def segment(self, data: pd.DataFrame) -> Tuple[Dict[str, np.ndarray], pd.Index]:
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("df must be a pandas DataFrame.")
+        if data.empty:
+            raise ValueError("df is empty.")
+        if data.columns.size == 0:
+            raise ValueError("df has no columns.")
+        # Initialize the output
+        segmented: Dict[str, np.ndarray] = {}
+        period_index: Optional[pd.Index] = None
+        # Proceed with the segmentation
+        for col in data.columns:
+            s = data[col]
             X, pidx = self.segmenter.segment(s)
-            out[name] = X
+            segmented[col] = X
             if period_index is None:
                 period_index = pidx
+
         assert period_index is not None
-        return out, period_index
+        return segmented, period_index
 
 
 # -----------------------------
@@ -203,29 +204,29 @@ class FeatureBuilder:
         feats = []
         P = None
         for var, X in segmented.items():
-            if P is None:
+            if P is None:  # Getting the number of periods
                 P = X.shape[0]
-            if X.ndim != 2:
+            if X.ndim != 2:  # Checking that the data has exactly two dimensions
                 raise ValueError(f"Segmented array for {var} must be 2D [P,L].")
-            w = float(self.cfg.var_weights.get(var, 1.0))
+            w = float(self.cfg.var_weights.get(var, 1.0))  # Gets the weight of the variable
 
             # shape features
             if self.cfg.include_shape:
-                mean = X.mean(axis=1, keepdims=True)
-                shape = X / (mean + self.cfg.eps)
-                feats.append(w * shape)
+                mean = X.mean(axis=1, keepdims=True)  # Calculates the mean for each period
+                shape = X / (mean + self.cfg.eps) # Adimensionalizes each value by dividing it by the period mean
+                feats.append(w * shape) # Each value is multiplied by the weight assigned to the feature
 
             # level features
             level_cols = []
             if self.cfg.include_level_mean:
-                level_cols.append(X.mean(axis=1, keepdims=True))
+                level_cols.append(X.mean(axis=1, keepdims=True))  # First element of level_cols is a vector with the mean of each day
             if self.cfg.include_level_max:
-                level_cols.append(X.max(axis=1, keepdims=True))
+                level_cols.append(X.max(axis=1, keepdims=True))  # Second element is the maximum value for each day
             if self.cfg.include_level_min:
-                level_cols.append(X.min(axis=1, keepdims=True))
+                level_cols.append(X.min(axis=1, keepdims=True))  # Third element (if selected) is the minimum value for each day
             if level_cols:
-                level = np.hstack(level_cols)
-                feats.append(w * level)
+                level = np.hstack(level_cols)  # Horizontally stacks the lists, getting a numpy array
+                feats.append(w * level) # Again we multiply the result by the weight
 
         if P is None:
             raise ValueError("No variables in segmented data.")
@@ -337,7 +338,7 @@ class ExtremeSelector:
         self.criteria = list(criteria)
 
     def select(self, segmented: Dict[str, np.ndarray]) -> List[int]:
-        P = next(iter(segmented.values())).shape[0]
+        P = next(iter(segmented.values())).shape[0]  # Number of periods
         chosen: List[int] = []
         for c in self.criteria:
             scores = c.score_fn(segmented)
