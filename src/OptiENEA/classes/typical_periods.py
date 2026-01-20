@@ -29,6 +29,7 @@ class TypicalPeriodSet:
     assignment: np.ndarray
     period_index: pd.Index
     hours_per_period: int
+    period: str
     meta: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -417,7 +418,7 @@ class TypicalPeriodBuilder:
             X_pool = X[pool]
             K_eff = self.typical_config.K
             if K_eff > len(pool):
-                raise ValueError("K too large relative to remaining periods after forcing extremes.")
+                raise ValueError(f"K too large relative to remaining periods after forcing extremes. You provided a value for K equal to {K_eff}, but the remaining number of periods is {len(pool)}")
             pam = KMedoidsPAM(random_state=self.typical_config.random_state, max_iter=self.typical_config.max_iter)
             res = pam.fit(X_pool, K_eff)
             medoids = pool[res.medoids]
@@ -517,8 +518,208 @@ class TypicalPeriodBuilder:
             assignment=np.array(assignment, dtype=int),
             period_index=period_index,
             hours_per_period=L,
+            period = self.typical_config.period,
             meta=meta,
         )
+
+
+@dataclass
+class ErrorReport:
+    """
+    metrics[var] -> dict of metric name -> value
+    reconstructed[var] -> pd.Series (hourly reconstructed)
+    """
+    metrics: Dict[str, Dict[str, float]]
+    reconstructed: Dict[str, pd.Series]
+    meta: Dict[str, Any] = field(default_factory=dict)
+
+
+def _rmse(a: np.ndarray, b: np.ndarray) -> float:
+    d = a - b
+    return float(np.sqrt(np.mean(d * d)))
+
+
+def _mae(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.mean(np.abs(a - b)))
+
+
+def _mape(a: np.ndarray, b: np.ndarray, eps: float = 1e-9) -> float:
+    # MAPE is dangerous when a ~ 0; we guard it.
+    denom = np.maximum(np.abs(a), eps)
+    return float(np.mean(np.abs((a - b) / denom)))
+
+
+def _energy_error(a: np.ndarray, b: np.ndarray) -> float:
+    # relative energy error
+    ea = float(a.sum())
+    eb = float(b.sum())
+    if abs(ea) < 1e-9:
+        return float("nan")
+    return float((eb - ea) / ea)
+
+
+def _peak_error(a: np.ndarray, b: np.ndarray) -> float:
+    pa = float(np.max(a))
+    pb = float(np.max(b))
+    if abs(pa) < 1e-9:
+        return float("nan")
+    return float((pb - pa) / pa)
+
+
+def _duration_curve_rmse(a: np.ndarray, b: np.ndarray) -> float:
+    # Compare sorted values (ignores chronology)
+    sa = np.sort(a)[::-1]
+    sb = np.sort(b)[::-1]
+    return _rmse(sa, sb)
+
+
+def _top_quantile_rmse(a: np.ndarray, b: np.ndarray, q: float = 0.01) -> float:
+    # RMSE on top q fraction (e.g., 1%) of original values
+    if not (0.0 < q < 1.0):
+        raise ValueError("q must be in (0,1)")
+    thresh = np.quantile(a, 1.0 - q)
+    mask = a >= thresh
+    if mask.sum() == 0:
+        return float("nan")
+    return _rmse(a[mask], b[mask])
+
+
+class TypicalPeriodEvaluator:
+    """
+    Reconstructs a synthetic hourly year by mapping each original period to its typical representative,
+    and computes error metrics between original and reconstructed.
+
+    Works if:
+      - you can provide the original hourly data (DataFrame) used to build typical periods
+      - TypicalPeriodSet.assignment exists (mapping from period p to cluster k)
+    """
+
+    def __init__(self, start: str = "2019-01-01 00:00"):
+        self.start = start
+
+    def reconstruct(self, tp: TypicalPeriodSet, original_df: pd.DataFrame) -> Dict[str, pd.Series]:
+        """
+        Returns reconstructed hourly series per variable.
+        """
+        # Segment original to know which hours belong to which period
+        seg = PeriodSegmenter(period=tp.period, hours_per_period=tp.hours_per_period)
+        L = seg.hours_per_period
+
+        # We'll segment by using one column to derive period_index + ensure full periods only
+        first_col = original_df.columns[0]
+        _, period_index = seg.segment(original_df[first_col])
+
+        P = len(period_index)
+        if P != len(tp.assignment):
+            raise ValueError(
+                f"TypicalPeriodSet.assignment length ({len(tp.assignment)}) does not match "
+                f"number of full periods in data ({P})."
+            )
+
+        reconstructed: Dict[str, pd.Series] = {}
+
+        # Build a reconstructed block [P, L] for each var, then flatten back to hourly
+        for var in tp.profiles.keys():
+            if var not in original_df.columns:
+                # you might have clustered on subset; skip if not in original
+                continue
+
+            # Segment original for alignment and to get which periods are "kept"
+            Xorig, pidx2 = seg.segment(original_df[var])
+            if not pidx2.equals(period_index):
+                raise ValueError(f"Period segmentation mismatch for var '{var}'.")
+
+            # Replace each period p with its assigned typical profile
+            Xrec = np.zeros_like(Xorig, dtype=float)
+            for p in range(P):
+                k = int(tp.assignment[p])
+                Xrec[p, :] = tp.profiles[var][k, :]
+
+            # Flatten to hourly and attach datetime index corresponding to the kept full periods
+            # Rebuild hourly index from period starts
+            hour_index = pd.date_range(start=period_index[0], periods=P * L, freq="H")
+            # reconstructed[var] = pd.Series(Xrec.reshape(-1), index=hour_index, name=var)
+            reconstructed[var] = pd.Series(Xrec.reshape(-1),name=var)
+
+        return reconstructed
+
+    def evaluate(
+        self,
+        typical_periods: TypicalPeriodSet,
+        original_data: pd.DataFrame,
+        metrics: Optional[List[str]] = None,
+        top_q: float = 0.01,
+    ) -> ErrorReport:
+        """
+        Compute error metrics per variable between original and reconstructed series.
+
+        Metrics supported:
+          - rmse, mae, mape
+          - energy_rel_error
+          - peak_rel_error
+          - duration_curve_rmse
+          - topq_rmse  (RMSE over top_q fraction of original values)
+        """
+        if metrics is None:
+            metrics = [
+                "rmse",
+                "mae",
+                "mape",
+                "energy_rel_error",
+                "peak_rel_error",
+                "duration_curve_rmse",
+                "topq_rmse",
+            ]
+
+        rec = self.reconstruct(typical_periods, original_data)
+
+        out_metrics: Dict[str, Dict[str, float]] = {}
+
+        for var, rec_s in rec.items():
+            # Align original to reconstructed range (because segmentation may drop partial last period)
+            orig_s = original_data[var].loc[rec_s.index.min() : rec_s.index.max()]
+            orig_s = orig_s.reindex(rec_s.index)
+
+            a = orig_s.to_numpy(dtype=float)
+            b = rec_s.to_numpy(dtype=float)
+
+            # Guard NaNs
+            mask = np.isfinite(a) & np.isfinite(b)
+            a = a[mask]
+            b = b[mask]
+            if len(a) == 0:
+                continue
+
+            md: Dict[str, float] = {}
+            for m in metrics:
+                if m == "rmse":
+                    md[m] = _rmse(a, b)
+                elif m == "mae":
+                    md[m] = _mae(a, b)
+                elif m == "mape":
+                    md[m] = _mape(a, b)
+                elif m == "energy_rel_error":
+                    md[m] = _energy_error(a, b)
+                elif m == "peak_rel_error":
+                    md[m] = _peak_error(a, b)
+                elif m == "duration_curve_rmse":
+                    md[m] = _duration_curve_rmse(a, b)
+                elif m == "topq_rmse":
+                    md[m] = _top_quantile_rmse(a, b, q=top_q)
+                else:
+                    raise ValueError(f"Unknown metric: {m}")
+
+            out_metrics[var] = md
+
+        meta = {
+            "period": self.period,
+            "hours_per_period": self.hours_per_period,
+            "top_q": top_q,
+            "note": "Reconstruction replaces each original period by its assigned typical profile; chronology within periods is preserved, across periods is approximated.",
+        }
+
+        return ErrorReport(metrics=out_metrics, reconstructed=rec, meta=meta)
+
 
 
 # -----------------------------
