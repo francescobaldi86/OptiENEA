@@ -1,6 +1,6 @@
 from OptiENEA.classes.problem import Problem
 from OptiENEA.classes.typical_periods import *
-import os, shutil, math, pytest
+import os, shutil, math, pytest, copy
 import pandas as pd
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
@@ -38,18 +38,24 @@ def test_extreme_selector(segmented_data, extreme_days_configuration):
     assert forced[0] == np.unravel_index(segmented_data[('Household', 'Power', 'Electricity')].argmax(), segmented_data[('Household', 'Power', 'Electricity')].shape)[0]
     assert forced[1] == segmented_data[('PV', 'Capacity factor', 'Electricity')].sum(axis=1).argmin()
 
-def test_full_function(data_raw, feature_config, typical_period_config):
+def test_clustering(data_raw, feature_config, typical_period_config):
     builder = TypicalPeriodBuilder(feature_config, typical_period_config)
     tp = builder.build(data_raw)
-    print(tp.meta["energy_errors"])     # should be ~0 per var
-    ampl_payload = tp.to_ampl_params()
+    assert all([i <= 0.01 for _, i in tp.meta["energy_errors"].items()])
     assert True
 
 def test_evaluation_metrics(data_raw, feature_config, typical_period_config):
-    builder = TypicalPeriodBuilder(feature_config, typical_period_config)
+    # First example: energy correction cluster-wise
+    typical_period_clusterwise = copy.copy(typical_period_config)
+    builder = TypicalPeriodBuilder(feature_config, typical_period_clusterwise)
     tp = builder.build(data_raw)
     evaluator = TypicalPeriodEvaluator()
-    evaluator.evaluate(tp, data_raw)
+    evaluation_clusterwise = evaluator.evaluate(tp, data_raw)
+    typical_period_global = copy.copy(typical_period_config)
+    typical_period_global.energy_correction = 'global'
+    builder = TypicalPeriodBuilder(feature_config, typical_period_global)
+    tp = builder.build(data_raw)
+    evaluation_global = evaluator.evaluate(tp, data_raw)
     assert True
 
 
@@ -86,7 +92,7 @@ def feature_config():
         include_shape=True,
         include_level_mean=True,
         include_level_max=True,
-        var_weights={"demand_el": 2.0, "pv": 1.0, "wind": 1.0},
+        var_weights={('Household', 'Power', 'Electricity'): 2.0, ('Household', 'Power', 'DHW'): 1.0, ('PV', 'Capacity factor', 'Electricity'): 1.5},
         standardize=True
     )
 

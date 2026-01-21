@@ -105,7 +105,7 @@ class PeriodSegmenter:
           period_index: index identifying each period (e.g., each date / week start)
         """
         if not isinstance(series.index, pd.DatetimeIndex):
-            series.index = pd.date_range(start = pd.to_datetime('2023-01-01 00:00'), periods=len(series.index.values), freq = 'H')
+            series.index = pd.date_range(start = pd.to_datetime('2023-01-01 00:00'), periods=len(series.index.values), freq = 'h')
 
         s = series.sort_index()
         if not self.tz_aware_ok and s.index.tz is not None:
@@ -637,7 +637,7 @@ class TypicalPeriodEvaluator:
 
             # Flatten to hourly and attach datetime index corresponding to the kept full periods
             # Rebuild hourly index from period starts
-            hour_index = pd.date_range(start=period_index[0], periods=P * L, freq="H")
+            hour_index = pd.date_range(start=period_index[0], periods=P * L, freq="h")
             # reconstructed[var] = pd.Series(Xrec.reshape(-1), index=hour_index, name=var)
             reconstructed[var] = pd.Series(Xrec.reshape(-1),name=var)
 
@@ -712,8 +712,8 @@ class TypicalPeriodEvaluator:
             out_metrics[var] = md
 
         meta = {
-            "period": self.period,
-            "hours_per_period": self.hours_per_period,
+            "period": typical_periods.period,
+            "hours_per_period": typical_periods.hours_per_period,
             "top_q": top_q,
             "note": "Reconstruction replaces each original period by its assigned typical profile; chronology within periods is preserved, across periods is approximated.",
         }
