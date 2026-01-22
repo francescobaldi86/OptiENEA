@@ -115,8 +115,11 @@ class Problem:
                   self.raw_unit_data = yaml.safe_load(stream)
             with open(os.path.join(self.input_folder, 'general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
-            with open(os.path.join(self.input_folder, 'constraints.yml'), 'r') as stream:
-                  self.additional_constraints_data = yaml.safe_load(stream)
+            try: 
+                  with open(os.path.join(self.input_folder, 'constraints.yml'), 'r') as stream:
+                        self.additional_constraints_data = yaml.safe_load(stream)
+            except FileNotFoundError:
+                  pass
             try:
                   self.raw_timeseries_data = pd.read_csv(
                         os.path.join(self.input_folder, 'timeseries_data.csv'), 
