@@ -280,7 +280,10 @@ class Problem:
             for unit_name, unit in self.units.items():
                   if isinstance(unit, Process):
                         for layer in unit.layers:
-                              temp = pd.DataFrame(index = unit.power[layer].index)
+                              if isinstance(unit.power[layer], pd.Series):
+                                    temp = pd.DataFrame(index = unit.power[layer].index)
+                              else:
+                                    temp = pd.DataFrame(index = [x for x in range(self.simulation_horizon)])
                               temp.loc[:, 'processes'] = unit_name      
                               temp.loc[:, 'layersOfUnit'] = layer
                               if not self.has_typical_periods:
