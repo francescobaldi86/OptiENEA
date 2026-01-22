@@ -2,6 +2,7 @@ from OptiENEA.classes.problem import Problem
 from OptiENEA.classes.typical_periods import *
 import os, shutil, math, pytest, copy
 import pandas as pd
+import time
 
 __HERE__ = os.path.dirname(os.path.realpath(__file__))
 __PARENT__ = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -58,8 +59,70 @@ def test_evaluation_metrics(data_raw, feature_config, typical_period_config):
     evaluation_global = evaluator.evaluate(tp, data_raw)
     assert True
 
+def test_evaluation_metrics_for_different_K(data_raw, feature_config, typical_period_config):
+    # First example: energy correction cluster-wise
+    output = pd.DataFrame(index = [x+1 for x in range(10)], columns = data_raw.columns)
+    for n_clusters in output.index:
+        typical_period_config.K = n_clusters
+        builder = TypicalPeriodBuilder(feature_config, typical_period_config)
+        tp = builder.build(data_raw)
+        evaluator = TypicalPeriodEvaluator()
+        temp = evaluator.evaluate(typical_periods=tp, original_data=data_raw)
+        for var in output.columns:
+            output.loc[n_clusters, var] = temp.metrics[var]['rmse']
+    assert all([output.iloc[0, id] > output.iloc[-1, id] for id in range(len(output.columns))])
 
+def test_export_to_ampl(data_raw, feature_config, typical_period_config):
+    builder = TypicalPeriodBuilder(feature_config, typical_period_config)
+    tp = builder.build(data_raw)
+    ampl_param = tp.to_ampl_params()
+    assert True
 
+def test_example_problem(tmp_path):
+    problem_folder = os.path.join(tmp_path, f'test_problem_typical_periods')
+    input_data_folder = os.path.join(problem_folder, 'Input')
+    os.mkdir(problem_folder)
+    os.mkdir(input_data_folder)
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', 'units.yml'), 
+                    os.path.join(input_data_folder, 'units.yml'))
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', 'timeseries_data_full.csv'), 
+                    os.path.join(input_data_folder, 'timeseries_data.csv'))
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_typical_periods', 'test_typical_periods_day.yml'), 
+                     os.path.join(input_data_folder, 'general.yml'))
+    problem = Problem(name = f'test_problem_typical_periods', 
+                      problem_folder = problem_folder)
+    problem.run()
+
+def test_example_problem_comparison(tmp_path):
+    # This test runs both the original problem and the one with typical days, and compare results and speed
+    # 1 - "Standard" problem
+    problem_folder = os.path.join(tmp_path, f'test_problem_base')
+    input_data_folder = os.path.join(problem_folder, 'Input')
+    os.mkdir(problem_folder)
+    os.mkdir(input_data_folder)
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', 'units.yml'), 
+                    os.path.join(input_data_folder, 'units.yml'))
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', 'timeseries_data_full.csv'), 
+                    os.path.join(input_data_folder, 'timeseries_data.csv'))
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', 'general.yml'), 
+                     os.path.join(input_data_folder, 'general.yml'))
+    start = time.time()
+    problem_standard = Problem(name = f'test_problem_standard', 
+                      problem_folder = problem_folder)
+    problem_standard.run()
+    elapsed_time_standard = time.time() - start
+    # 2 - "Typical periods" problem
+    
+    shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_typical_periods', 'test_typical_periods_day.yml'), 
+                     os.path.join(input_data_folder, 'general.yml'))
+    start = time.time()
+    problem_typical_periods = Problem(name = f'test_problem_typical_periods', 
+                      problem_folder = problem_folder)
+    problem_typical_periods.run()
+    elapsed_time_typical_periods = time.time() - start
+    assert elapsed_time_standard > elapsed_time_typical_periods
+    rel_err = (problem_standard.output.output_units - problem_typical_periods.output.output_units) / (problem_standard.output.output_units + 1e-3)
+    assert rel_err.mean() <= 0.05
 
 
 @pytest.fixture
@@ -99,7 +162,7 @@ def feature_config():
 @pytest.fixture
 def typical_period_config(extreme_days_configuration):
     return TypicalPeriodConfig(
-        K=10,
+        K=3,
         period="day",
         energy_correction="clusterwise",
         extreme_selector=extreme_days_configuration,

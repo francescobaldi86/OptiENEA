@@ -23,6 +23,7 @@ class AmplProblem(amplpy.AMPL):
         self.has_minimum_installed_power = False
         self.has_units_with_minimum_size_if_installed = False
         self.has_units_operated_only_on_off = False
+        self.has_typical_periods = False
         self.units_with_time_dependent_maximum_power = []
         self.layers_with_time_dependent_price = []
         self.problem = problem
@@ -68,6 +69,9 @@ class AmplProblem(amplpy.AMPL):
         # Check if the problem has units that can only be operated on an on/off basis
         if len(self.problem.sets['unitsOnOff'].content) > 0:
             self.has_units_operated_only_on_off = True
+        # Check if problem has typical periods
+        if self.problem.has_typical_periods:
+            self.has_typical_periods = True
 
     def write_mod_file(self):
         self.write_sets()
@@ -76,6 +80,8 @@ class AmplProblem(amplpy.AMPL):
         self.write_objective()
         self.write_base_constraints()
         self.write_additional_constraints()
+        if self.has_typical_periods:
+            self.typical_periods_transformation()
         self.eval(self.mod_string)
 
     def write_sets(self):
@@ -126,7 +132,7 @@ class AmplProblem(amplpy.AMPL):
             temp_params.append("param ENERGY_MAX{u in storageUnits} default 0;")
             temp_params.append("param CRATE{u in storageUnits} default 1;")
             temp_params.append("param ERATE{u in storageUnits} default 1;")
-            temp_params.append("param STORAGE_CYCLIC_ACTIVE default 1;")
+            temp_params.append("param ERROR_MARGIN_ON_CYCLIC_SOC default 0.05;")
             idx = temp_params.index("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
             idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
@@ -165,7 +171,6 @@ class AmplProblem(amplpy.AMPL):
             self.mod_string += constraint
         self.mod_string += "\n\n"
 
-
     def write_base_constraints(self):
         # Adds the problem constraints to the mod file string
         temp_constraints = []
@@ -183,7 +188,7 @@ class AmplProblem(amplpy.AMPL):
         if self.has_minimum_installed_power:
             temp_constraints.append("s.t. minimum_installed_power{u in nonmarketUtilities}: size[u] >= POWER_MIN[u];")
         # Constraints to be added depending on whether energy prices depend on the time step or not
-        temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")
+        temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")        
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
         temp_constraints.append("s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
         # temp_constraints.append("s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")
@@ -204,8 +209,10 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("\t\telse")
             temp_constraints.append("\t\t\tenergyStorageLevel[u,l,t-1] - power[u,l,t]*TIME_STEP_DURATION")
             temp_constraints.append("\t);")
-            temp_constraints.append("s.t. storage_cyclic_constraint{u in storageUnits, l in layersOfUnit[u]}:")
-            temp_constraints.append("\tenergyStorageLevel[u,l,1] <= STORAGE_CYCLIC_ACTIVE * energyStorageLevel[u,l,card(timeSteps)-1];")
+            temp_constraints.append("s.t. storage_cyclic_constraint_high{u in storageUnits, l in layersOfUnit[u]}:")
+            temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] >= 0;")
+            temp_constraints.append("s.t. storage_cyclic_constraint_low{u in storageUnits, l in layersOfUnit[u]}:")
+            temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] <= ERROR_MARGIN_ON_CYCLIC_SOC;")
             temp_constraints.append("s.t. storage_max_energy{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,t] <= size[u];")
             temp_constraints.append("s.t. storage_max_energy2{u in storageUnits}:")
@@ -223,6 +230,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. discharging_power_only_negative{u in storageUnits, l in layersOfUnit[u], dis in dischargingUtilitiesOfStorageUnit[u], t in timeSteps}:")
             temp_constraints.append("\tpower[dis,l,t] <= 0;")
         self.mod_string += "\n".join(temp_constraints) + "\n\n\n"
+        
 
     def write_additional_constraints(self):
         additional_constraints = []
@@ -232,6 +240,20 @@ class AmplProblem(amplpy.AMPL):
             additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
             additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) <= {constraint['parameter name']};")
         self.mod_string += "\n".join(additional_constraints) + "\n\n\n"
+
+    def typical_periods_transformation(self):
+        self.mod_string = self.mod_string.replace("set timeSteps;", "set typicalPeriods;\nset timeStepsOfPeriod{tp in typicalPeriods};")
+        self.mod_string = self.mod_string.replace("param OCCURRANCE;", "param OCCURRANCE{tp in typicalPeriods};")
+        self.mod_string = self.mod_string.replace("* OCCURRANCE;", "* OCCURRANCE[tp];")
+        self.mod_string = self.mod_string.replace('t in timeSteps', 'tp in typicalPeriods, t in timeStepsOfPeriod[tp]')
+        self.mod_string = self.mod_string.replace('t]','tp,t]')
+        self.mod_string = self.mod_string.replace('l,t-1]','l,tp,t-1]')
+        self.mod_string = self.mod_string.replace("energyStorageLevel[u,l,", "energyStorageLevel[u,l,tp,")        
+        self.mod_string = self.mod_string.replace("{u in storageUnits, l in layersOfUnit[u]}",
+                                                  "{u in storageUnits, l in layersOfUnit[u], tp in typicalPeriods}")
+        self.mod_string = self.mod_string.replace("energyStorageLevel0[u,l]", "energyStorageLevel0[u,l,tp]")
+        self.mod_string = self.mod_string.replace("tp,tp,", 'tp,')
+        self.mod_string = self.mod_string.replace("(timeSteps)", "(timeStepsOfPeriod[tp])")
 
     def write_sets_to_amplpy(self):
         # Writes problem data about sets to amplpy

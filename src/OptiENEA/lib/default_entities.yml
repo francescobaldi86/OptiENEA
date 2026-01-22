@@ -1,5 +1,6 @@
 SETS:
   timeSteps:
+  typicalPeriods:
   layers:
   markets:
   standardUtilities:
@@ -7,6 +8,8 @@ SETS:
   storageUnits:
   unitsWithMinimumSizeIfInstalled:
   unitsOnOff:
+  timeStepsOfPeriod:
+    - typicalPeriods
   layersOfUnit:
     - units
   mainLayerOfUnit:
