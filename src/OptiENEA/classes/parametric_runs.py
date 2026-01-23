@@ -54,6 +54,7 @@ class ParametricRuns():
     def run(self):
         # Runs the scenarios loaded
         print(f'Start running parametric test "{self.name}"')
+        self.problem.create_folders()
         self.create_folders()
         parameters_to_update = self.check_parameters_to_update()
         
@@ -61,7 +62,7 @@ class ParametricRuns():
             problem = Problem(
                 name = self.problem.name, 
                 problem_folder = self.problem.problem_folder,
-                temp_folder = os.path.join(self.parametric_runs_temp_folder),
+                temp_folder = os.path.join(self.parametric_runs_temp_folder, f'Scenario {scenario}'),
                 results_folder = os.path.join(self.parametric_runs_results_folder)
                 )
             validate_project_structure(problem.problem_folder)
@@ -112,7 +113,7 @@ class ParametricRuns():
                     else:
                         temp_kpi.loc[scenario, kpi] = temp_output_units.loc[kpi[1].split(':')[1], kpi[1].split(':')[0]]
         self.output = self.output.combine_first(temp_kpi)
-        self.output.to_excel(os.path.join(self.parametric_runs_folder, f'{self.name}_parametric_results.xlsx'))
+        self.output.to_excel(os.path.join(self.parametric_runs_results_folder, f'{self.name}_parametric_results.xlsx'))
 
         
     def scenarios_to_run(self, scenarios_to_run: str = 'all'):
@@ -151,7 +152,7 @@ class ParametricRuns():
 
     def read_optimization_output_files(self, run_name, scenario):
         if run_name == 'temp':
-            file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(self.parametric_runs_results_folder, f)]
+            file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
             flie_list = [f for f in file_list if f'Scenario {scenario}' in f]
             if len(file_list) > 0:
                 file_name = file_list[0]
