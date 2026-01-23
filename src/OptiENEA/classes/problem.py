@@ -157,7 +157,7 @@ class Problem:
 
       def generate_typical_periods(self):
             if self.has_typical_periods == False:
-                  self.parameters["OCCURRANCE"].content = 1
+                  self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
             else:
                   tp_param = self.raw_general_data['Settings']['Typical periods']
                   tp_builder = TypicalPeriodBuilder(

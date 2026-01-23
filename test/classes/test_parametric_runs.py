@@ -29,12 +29,11 @@ def test_read_parametric_problem_data(empty_problem):
     assert parametric_runs.kpis.loc[3, 'Indexing'] == 'PV'  
     
 def test_write_parametric_data_results(empty_problem):
-    parametric_runs = ParametricRuns('test', empty_problem)
+    parametric_runs = ParametricRuns('parametric analysis test', empty_problem)
     parametric_runs.load_scenario_file()
     parametric_runs.run()
-    parametric_runs.generate_summary_output_file()
     test_output = pd.read_excel(
-        os.path.join(parametric_runs.problem.problem_folder, 'Parametric run test', f'{parametric_runs.name}_parametric_results.xlsx'),
+        os.path.join(parametric_runs.parametric_runs_results_folder, f'{parametric_runs.name}_parametric_results.xlsx'),
         skiprows=[2],
         header = [0,1],
         index_col = 0
@@ -46,13 +45,14 @@ def test_write_parametric_data_results(empty_problem):
 
 @pytest.fixture
 def empty_problem(tmp_path):
-    problem_folder = os.path.join(tmp_path, 'test_parametric_runs')
+    problem_name = 'test_problem'
+    problem_folder = os.path.join(tmp_path, problem_name)
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
     for filename in ('units.yml', 'general.yml', 'timeseries_data.csv', 'Scenarios.xlsx'):
         shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_parametric_runs', filename), 
                      os.path.join(input_data_folder, filename))
-    problem = Problem(name = 'test_problem', 
+    problem = Problem(name = problem_name, 
                       problem_folder = problem_folder)
     yield problem

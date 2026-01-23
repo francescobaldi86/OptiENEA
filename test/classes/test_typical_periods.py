@@ -1,6 +1,6 @@
 from OptiENEA.classes.problem import Problem
 from OptiENEA.classes.typical_periods import *
-import os, shutil, math, pytest, copy
+import os, shutil, math, pytest, copy, yaml
 import pandas as pd
 import time
 
@@ -106,6 +106,14 @@ def test_example_problem_comparison(tmp_path):
                     os.path.join(input_data_folder, 'timeseries_data.csv'))
     shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_problem', f'test_problem_3', 'general.yml'), 
                      os.path.join(input_data_folder, 'general.yml'))
+    # Changing the required settings in general.yml
+    with open(os.path.join(input_data_folder,'general.yml'), "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    data["Standard parameters"]["NT"] = 8760
+    data["Standard parameters"]["Occurrance"] = 1
+    with open(os.path.join(input_data_folder,'general.yml'), "w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f, sort_keys=False),  # keep key order
+    # Start simulation
     start = time.time()
     problem_standard = Problem(name = f'test_problem_standard', 
                       problem_folder = problem_folder)
@@ -121,8 +129,8 @@ def test_example_problem_comparison(tmp_path):
     problem_typical_periods.run()
     elapsed_time_typical_periods = time.time() - start
     assert elapsed_time_standard > elapsed_time_typical_periods
-    rel_err = (problem_standard.output.output_units - problem_typical_periods.output.output_units) / (problem_standard.output.output_units + 1e-3)
-    assert rel_err.mean() <= 0.05
+    assert math.isclose(problem_standard.output.output_units.loc['PV', 'size'], problem_typical_periods.output.output_units.loc['PV', 'size'])
+    assert math.isclose(problem_standard.output.output_units.loc['battery', 'size'], problem_typical_periods.output.output_units.loc['battery', 'size'])
 
 
 @pytest.fixture
