@@ -132,7 +132,7 @@ class AmplProblem(amplpy.AMPL):
             temp_params.append("param ENERGY_MAX{u in storageUnits} default 0;")
             temp_params.append("param CRATE{u in storageUnits} default 1;")
             temp_params.append("param ERATE{u in storageUnits} default 1;")
-            temp_params.append("param ERROR_MARGIN_ON_CYCLIC_SOC default 0.05;")
+            temp_params.append("param ERROR_MARGIN_ON_CYCLIC_SOC default 0.1;")
             idx = temp_params.index("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
             idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
@@ -212,7 +212,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. storage_cyclic_constraint_high{u in storageUnits, l in layersOfUnit[u]}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] >= 0;")
             temp_constraints.append("s.t. storage_cyclic_constraint_low{u in storageUnits, l in layersOfUnit[u]}:")
-            temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] <= ERROR_MARGIN_ON_CYCLIC_SOC;")
+            temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] <= ERROR_MARGIN_ON_CYCLIC_SOC * size[u];")
             temp_constraints.append("s.t. storage_max_energy{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,t] <= size[u];")
             temp_constraints.append("s.t. storage_max_energy2{u in storageUnits}:")

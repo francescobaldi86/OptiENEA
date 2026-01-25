@@ -68,6 +68,7 @@ class Problem:
             self.raw_general_data = {}
             self.raw_unit_data = {}
             self.additional_constraints_data = {}
+            self.has_typical_periods = False
 
       def load_problem_data():
             """

@@ -354,7 +354,7 @@ class Market(Utility):
         self.has_time_dependent_energy_prices = {l: False for l in self.layers}
         if self.ts_data is not None:
             for layer in self.layers:
-                if ('Price variation', layer) in self.ts_data.columns or ('Price', layer) in self.ts_data.columns:
+                if f'{self.name}:Price variation:{layer}' in self.ts_data.columns or f'{self.name}:Price:{layer}' in self.ts_data.columns:
                     self.has_time_dependent_energy_prices[layer] = True                    
         for id, layer in enumerate(self.layers):
             if self.has_time_dependent_energy_prices[layer] == False:
@@ -364,11 +364,11 @@ class Market(Utility):
                     self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
                     self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]
                 elif isinstance(self.info['Price'][id], float | int) and f'{self.name}:Price variation:{layer}' in self.ts_data.columns: # Case 1: Price value and price variation
-                    average_price = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
-                    maximum_price = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].max()
+                    average_price = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}'].mean()
+                    maximum_price = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}'].max()
                     if round(average_price, 1) == 1.0 or round(maximum_price,1) == 1.0:
                         self.energy_price[layer] = self.info['Price'][id]
-                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}']
                     else:
                         raise ValueError(f'Time series and price values for market {self.name} are not consistent. The time series for price variation will be multiplied by the reference price, so it should be either a value with mean = 1 or with max = 1')
                 elif isinstance(self.info['Price'][id], float | int) and f'{self.name}:Price:{layer}' in self.ts_data.columns:  # Case 2: price value and "Price" column

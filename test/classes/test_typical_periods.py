@@ -130,7 +130,7 @@ def test_example_problem_comparison(tmp_path):
     elapsed_time_typical_periods = time.time() - start
     assert elapsed_time_standard > elapsed_time_typical_periods
     assert math.isclose(problem_standard.output.output_units.loc['PV', 'size'], problem_typical_periods.output.output_units.loc['PV', 'size'])
-    assert math.isclose(problem_standard.output.output_units.loc['battery', 'size'], problem_typical_periods.output.output_units.loc['battery', 'size'])
+    assert math.isclose(problem_standard.output.output_units.loc['Battery', 'size'], problem_typical_periods.output.output_units.loc['Battery', 'size'])
 
 
 @pytest.fixture

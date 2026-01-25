@@ -39,9 +39,9 @@ def test_write_parametric_data_results(empty_problem):
         index_col = 0
     )
     assert test_output.loc[:, ('Output', 'size:PV')].sum() == 0
-    assert (test_output.loc[:, ('Output', 'size:HeatPump')] > 0).sum() == 2
+    assert (test_output.loc[:, ('Output', 'size:HeatPump')] > 0).sum() == 0
     assert math.isclose(test_output.loc[2, ('Output', 'TOTEX')], 60, abs_tol=1)
-    assert math.isclose(test_output.loc[3, ('Output', 'CAPEX')], 19, abs_tol=1)
+    assert math.isclose(test_output.loc[3, ('Output', 'CAPEX')], 9, abs_tol=1)
 
 @pytest.fixture
 def empty_problem(tmp_path):

@@ -58,12 +58,13 @@ def test_market_variable_price_2(problem, market_info):
 
 def test_market_variable_price_3(problem, market_info):
     # Case 3: both are time-dependent, but with relative values provided
-    problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price variation', 'Electricity')] = problem.raw_timeseries_data.loc[:, ('TestMarket', 'Capacity factor', 'All layers')] / problem.raw_timeseries_data.loc[:, ('TestMarket', 'Capacity factor', 'All layers')].mean()
-    problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price variation', 'Natural gas')] = problem.raw_timeseries_data.loc[:, ('TestMarket', 'Capacity factor', 'All layers')] / problem.raw_timeseries_data.loc[:, ('TestMarket', 'Capacity factor', 'All layers')].mean()
+    problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price variation', 'Electricity')] = problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price', 'Electricity')] / problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price', 'Electricity')].mean()
+    problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price variation', 'Natural gas')] = problem.raw_timeseries_data.loc[:, ('TestMarket', 'Price variation', 'Electricity')]
+    problem.raw_timeseries_data = problem.raw_timeseries_data.drop([('TestMarket', 'Price', 'Electricity')], axis=1)
     test_market = Market('TestMarket', market_info, problem)
     assert test_market.has_time_dependent_energy_prices['Electricity'] == True
     assert test_market.has_time_dependent_energy_prices['Natural gas'] == True
-    assert math.isclose(test_market.energy_price_variation['Natural gas'].loc[10], 0.878, abs_tol = 0.01)
+    assert math.isclose(test_market.energy_price_variation['Natural gas'].loc[10], 0.215, abs_tol = 0.01)
     assert math.isclose(test_market.energy_price['Natural gas'], 0.09, abs_tol = 1)
 
 def test_market_variable_price_4(problem, market_info):
