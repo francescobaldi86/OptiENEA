@@ -245,6 +245,7 @@ class AmplProblem(amplpy.AMPL):
         self.mod_string = self.mod_string.replace("set timeSteps;", "set typicalPeriods;\nset timeStepsOfPeriod{tp in typicalPeriods};")
         self.mod_string = self.mod_string.replace("param OCCURRANCE;", "param OCCURRANCE{tp in typicalPeriods};")
         self.mod_string = self.mod_string.replace("* OCCURRANCE;", "* OCCURRANCE[tp];")
+        self.mod_string = self.mod_string.replace("* OCCURRANCE)", "* OCCURRANCE[tp])")
         self.mod_string = self.mod_string.replace('t in timeSteps', 'tp in typicalPeriods, t in timeStepsOfPeriod[tp]')
         self.mod_string = self.mod_string.replace('t]','tp,t]')
         self.mod_string = self.mod_string.replace('l,t-1]','l,tp,t-1]')

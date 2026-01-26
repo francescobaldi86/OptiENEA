@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple, Callable, Any
 import numpy as np
 import pandas as pd
+import yaml
 
 
 # -----------------------------
@@ -70,6 +71,47 @@ class TypicalPeriodSet:
         for var, arr in self.profiles.items():
             out["params"][var] = {(k + 1, t + 1): float(arr[k, t]) for k in range(K) for t in range(L)}
         return out
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert to a pure-Python dict that is YAML-serializable.
+        Arrays become (nested) lists. Indices become ISO strings where applicable.
+        """
+        # Serialize period_index carefully
+        if isinstance(self.period_index, pd.DatetimeIndex):
+            period_index = [ts.isoformat() for ts in self.period_index.to_pydatetime()]
+            period_index_type = "datetime"
+        else:
+            # fallback: stringify
+            period_index = [str(x) for x in self.period_index]
+            period_index_type = type(self.period_index).__name__
+
+        return {
+            "hours_per_period": int(self.hours_per_period),
+            "weights": self.weights.astype(float).tolist(),
+            "representatives": self.representatives.astype(int).tolist(),
+            "assignment": self.assignment.astype(int).tolist(),
+            "profiles": {
+                var: arr.astype(float).tolist()
+                for var, arr in self.profiles.items()
+            },
+            "period_index": {
+                "type": period_index_type,
+                "values": period_index,
+                "name": getattr(self.period_index, "name", None),
+            },
+            "meta": self.meta if self.meta is not None else {},
+        }
+
+
+    def to_yaml(self, path: str) -> None:
+        """
+        Save TypicalPeriodSet contents to a YAML file.
+        """
+        payload = self.to_dict()
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(payload, f, sort_keys=False, allow_unicode=True)
+        
 
 
 # -----------------------------
@@ -738,6 +780,12 @@ def extreme_min_sum(var: str, take: int = 1) -> ExtremeCriterion:
         X = seg[var]
         return X.sum(axis=1)
     return ExtremeCriterion(name=f"min_energy_{var}", score_fn=score, mode="min", take=take)
+
+def extreme_max_sum(var: str, take: int = 1) -> ExtremeCriterion:
+    def score(seg: Dict[str, np.ndarray]) -> np.ndarray:
+        X = seg[var]
+        return X.sum(axis=1)
+    return ExtremeCriterion(name=f"max_energy_{var}", score_fn=score, mode="max", take=take)
 
 
 def extreme_netload_peak(demand_var: str, supply_var: str, take: int = 1) -> ExtremeCriterion:

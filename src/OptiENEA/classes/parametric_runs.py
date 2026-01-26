@@ -25,6 +25,7 @@ class ParametricRuns():
         self.filename_scenario_description = filename_scenarios
         self.parametric_runs_results_folder = os.path.join(self.problem.problem_folder, 'Results', self.run_name)
         self.parametric_runs_temp_folder = os.path.join(self.problem.problem_folder, 'Temporary files', self.run_name)
+        self.typical_periods = None
         self.load_scenario_file()
 
     def load_scenario_file(self):
@@ -62,7 +63,7 @@ class ParametricRuns():
             problem = Problem(
                 name = self.problem.name, 
                 problem_folder = self.problem.problem_folder,
-                temp_folder = os.path.join(self.parametric_runs_temp_folder, f'Scenario {scenario}'),
+                temp_folder = os.path.join(self.parametric_runs_temp_folder),
                 results_folder = os.path.join(self.parametric_runs_results_folder)
                 )
             validate_project_structure(problem.problem_folder)
@@ -71,12 +72,18 @@ class ParametricRuns():
             # This part updates "raw" values
             self.update_raw_parameters(parameters_to_update['Raw'], problem, scenario)
             problem.read_problem_parameters()
+            if self.typical_periods is None:
+                problem.generate_typical_periods()  # If needed, generates the data about the typical periods
+                self.typical_periods = problem.typical_periods
+            else:
+                problem.typical_periods = self.typical_periods
+            problem.set_occurrance()
             problem.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
             problem.parse_sets()
             problem.parse_parameters()
             # This part updates "final" parameters
             self.update_problem_parameters(parameters_to_update['Problem'], problem, scenario)
-            run_name = f'Scenario {scenario} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
+            run_name = f'Scenario {scenario}'  # f'Scenario {scenario} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
             self.scenarios_description.loc[scenario, ('Run name','-','-','-')] = run_name
             problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
             print(f'Starting solving problem {problem.name} in scenario # {scenario}')
@@ -92,12 +99,15 @@ class ParametricRuns():
         except FileExistsError:
             pass
 
-    def generate_summary_output_file(self):
+    def generate_summary_output_file(self, results_folder: str | None = None):
         """
         This method creates a summary output file by reading the output
         """
         # 1 - The results include the input
         self.output = self.scenarios_description.copy(deep=True)
+        # If a results folder is provided, the base one is overridden (useful if you have already the optimisation results and want to summarize them)
+        if results_folder:
+            self.parametric_runs_results_folder = results_folder
         # 2 - Flatte the column index
         column_names = [('Input', ':'.join([x for x in param if x not in ("-", 'Problem', 'units.yml', 'general.yml')])) for param in self.output.columns]
         self.output.columns = pd.MultiIndex.from_tuples(column_names)
@@ -153,7 +163,7 @@ class ParametricRuns():
     def read_optimization_output_files(self, run_name, scenario):
         if run_name == 'temp':
             file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
-            flie_list = [f for f in file_list if f'Scenario {scenario}' in f]
+            file_list = [f for f in file_list if f'Scenario {scenario} run' in f]
             if len(file_list) > 0:
                 file_name = file_list[0]
             else:

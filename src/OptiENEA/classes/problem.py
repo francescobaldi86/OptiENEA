@@ -54,7 +54,6 @@ class Problem:
             self.temp_folder = temp_folder or os.path.join(self.problem_folder, 'Temporary files')
             self.input_folder = input_folder or os.path.join(self.problem_folder, 'Input')
             self.results_folder = results_folder or os.path.join(self.problem_folder, 'Results')
-            self
             self.units = {}
             self.sets = Set.create_empty_sets()
             self.parameters = Parameter.create_empty_parameters()
@@ -84,6 +83,7 @@ class Problem:
             self.read_problem_data()  # Reads problem general data and data about units
             self.read_problem_parameters()
             self.generate_typical_periods()  # If needed, generates the data about the typical periods
+            self.set_occurrance()
             self.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
             self.parse_sets()
             self.parse_parameters()
@@ -158,7 +158,7 @@ class Problem:
 
       def generate_typical_periods(self):
             if self.has_typical_periods == False:
-                  self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
+                  self.typical_periods = None
             else:
                   tp_param = self.raw_general_data['Settings']['Typical periods']
                   tp_builder = TypicalPeriodBuilder(
@@ -178,11 +178,7 @@ class Problem:
                   print('Building typical periods...', end=' ')
                   self.typical_periods = tp_builder.build(self.raw_timeseries_data)
                   print('Done')
-                  self.tp_timeseries_data = self.typical_periods.to_ampl_params()
-                  self.parameters['OCCURRANCE'] = Parameter('OCCURRANCE', ['typicalPeriods'])
-                  self.parameters['OCCURRANCE'].content['typicalPeriods'] = np.arange(self.typical_periods.K)
-                  self.parameters['OCCURRANCE'].content['OCCURRANCE'] = np.array(self.typical_periods.weights, dtype=np.int32)
-                  self.parameters['OCCURRANCE'].content.set_index('typicalPeriods', inplace = True)
+                  self.typical_periods.to_yaml(path = os.path.join(self.temp_folder, 'typical_periods_data.yml'))
       
       @staticmethod
       def read_extreme_selector_data(tp_param_extreme):
@@ -197,6 +193,17 @@ class Problem:
                         case 'netload_peak':
                               config.append(extreme_netload_peak(var_name, take = 1))
             return ExtremeSelector(config)
+      
+      def set_occurrance(self):
+            if self.has_typical_periods == False:
+                  self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
+            else:
+                  self.tp_timeseries_data = self.typical_periods.to_ampl_params()
+                  self.parameters['OCCURRANCE'] = Parameter('OCCURRANCE', ['typicalPeriods'])
+                  self.parameters['OCCURRANCE'].content['typicalPeriods'] = np.arange(self.typical_periods.K)
+                  self.parameters['OCCURRANCE'].content['OCCURRANCE'] = np.array(self.typical_periods.weights, dtype=np.int32)
+                  self.parameters['OCCURRANCE'].content.set_index('typicalPeriods', inplace = True)
+
 
       
       def read_units_data(self):
