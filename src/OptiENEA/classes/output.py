@@ -42,7 +42,7 @@ class OptimizationOutput:
         for column in self.output_timeseries.columns:
             if (self.output_timeseries[column] == 0).all():
                 columns_to_drop.append(column)
-        self.output_timeseries = self.output_timeseries.drop(columns=columns_to_drop, axis=1)
+        self.output_timeseries = self.output_timeseries.drop(columns=columns_to_drop)
         self.output_kpis = pd.DataFrame(self.output_kpis).set_index('KPI')
     
     def save_output_to_excel(self, run_name):
