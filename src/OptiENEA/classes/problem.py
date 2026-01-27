@@ -166,7 +166,7 @@ class Problem:
                               include_shape = True,
                               include_level_mean = True,
                               include_level_max = True,
-                              var_weights = tp_param['Weights'],
+                              var_weights = tp_param['Weights'] if tp_param['Weights'] is not None else {},
                               standardize=True),
                         TypicalPeriodConfig(
                               K = tp_param['Number of typical periods'] if 'Number of typical periods' in tp_param else 4,
