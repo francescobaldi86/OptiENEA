@@ -212,7 +212,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. storage_cyclic_constraint_high{u in storageUnits, l in layersOfUnit[u]}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] >= 0;")
             temp_constraints.append("s.t. storage_cyclic_constraint_low{u in storageUnits, l in layersOfUnit[u]}:")
-            temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] <= ERROR_MARGIN_ON_CYCLIC_SOC * size[u];")
+            temp_constraints.append("\tenergyStorageLevel[u,l,1] - energyStorageLevel[u,l,card(timeSteps)-1] <= ERROR_MARGIN_ON_CYCLIC_SOC * ENERGY_MAX[u];")
             temp_constraints.append("s.t. storage_max_energy{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,t] <= size[u];")
             temp_constraints.append("s.t. storage_max_energy2{u in storageUnits}:")
