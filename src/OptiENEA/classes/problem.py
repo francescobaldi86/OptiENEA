@@ -190,6 +190,8 @@ class Problem:
                               config.append(extreme_peak(var_name, take = 1))
                         case 'min_sum':
                               config.append(extreme_min_sum(var_name, take = 1))
+                        case 'max_sum':
+                              config.append(extreme_max_sum(var_name, take = 1))
                         case 'netload_peak':
                               config.append(extreme_netload_peak(var_name, take = 1))
             return ExtremeSelector(config)
