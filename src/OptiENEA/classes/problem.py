@@ -353,7 +353,7 @@ class Problem:
                               parameter.content = pd.concat(parameter.list_content)
                         else:
                               parameter.content = pd.DataFrame(parameter.list_content)
-                        parameter.content = parameter.content.astype(np.float32)
+                        parameter.content = parameter.content.assign(**{param_name: parameter.content[param_name].astype(float)})  # Sets all parameter values to float, so to avoid data type issuse when re-setting the parameter value
                         parameter.content = parameter.content.set_index([x for x in parameter.content.columns if x != param_name])
 
       def update_problem_parameters(self, name, indexing, value):
