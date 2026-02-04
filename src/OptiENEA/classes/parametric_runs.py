@@ -1,8 +1,11 @@
 from OptiENEA.classes.problem import Problem
 from OptiENEA.helpers.helpers import validate_project_structure
 import pandas as pd
+import numpy as np
 import os
 from datetime import datetime
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 """
 This class is made to provide support for parametric runs
@@ -35,7 +38,8 @@ class ParametricRuns():
             'Scenarios',
             header = [0, 1, 2, 3], 
             index_col = 0,
-            na_values = 'baseline'
+            na_values = 'baseline',
+            dtype = np.float32
         )
         self.kpis = pd.read_excel(
             os.path.join(self.problem.problem_folder, "Input", self.filename_scenario_description),
@@ -114,8 +118,11 @@ class ParametricRuns():
         kpi_columns = [('Output', ':'.join([self.kpis.loc[x, 'Name'],self.kpis.loc[x, 'Indexing']])) for x in self.kpis.index if self.kpis.loc[x, 'Indexing'] != '-']
         kpi_columns = kpi_columns + [('Output', self.kpis.loc[x, 'Name']) for x in self.kpis.index if self.kpis.loc[x, 'Indexing'] == '-']
         temp_kpi = pd.DataFrame(index = self.output.index, columns = pd.MultiIndex.from_tuples(kpi_columns))
-        for scenario in self.scenarios_description.index:
-            temp_output_kpis, temp_output_units = self.read_optimization_output_files(self.output.loc[scenario, ('Input','Run name:::')], scenario)
+        # Identifying result files
+        file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
+        file_list = [f for f in file_list if (('Results' in f) and ('.xlsx' in f))]
+        for scenario, results_filename in enumerate(file_list):
+            temp_output_kpis, temp_output_units = self.read_optimization_output_files(results_filename)
             if (temp_output_kpis is not None) and (temp_output_units is not None):
                 for kpi in kpi_columns:
                     if len(kpi[1].split(':')) == 1:
@@ -124,6 +131,7 @@ class ParametricRuns():
                         temp_kpi.loc[scenario, kpi] = temp_output_units.loc[kpi[1].split(':')[1], kpi[1].split(':')[0]]
         self.output = self.output.combine_first(temp_kpi)
         self.output.to_excel(os.path.join(self.parametric_runs_results_folder, f'{self.name}_parametric_results.xlsx'))
+        return self.output
 
         
     def scenarios_to_run(self, scenarios_to_run: str = 'all'):
@@ -160,26 +168,97 @@ class ParametricRuns():
             problem.update_problem_parameters(param_name, indexing, self.scenarios_description.loc[scenario, param])
         return problem
 
-    def read_optimization_output_files(self, run_name, scenario):
-        if run_name == 'temp':
-            file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
-            file_list = [f for f in file_list if f'Scenario {scenario} run' in f]
-            if len(file_list) > 0:
-                file_name = file_list[0]
-            else:
-                return None, None  # In case no result file was generated
-        else:
-            file_name = f'Results_{run_name}.xlsx'
+    def read_optimization_output_files(self, results_filename):
         kpis = pd.read_excel(
-            os.path.join(self.parametric_runs_results_folder, file_name),
+            os.path.join(self.parametric_runs_results_folder, results_filename),
             'kpis',
             header = 0, 
             index_col = 0,
         )
         units = pd.read_excel(
-            os.path.join(self.parametric_runs_results_folder, file_name),
+            os.path.join(self.parametric_runs_results_folder, results_filename),
             'units',
             header = 0, 
             index_col = 0,
         )
         return kpis, units
+    
+    def plot_costs_by_scenario(
+        self,
+        capex_col: str = ("Output", "CAPEX"),
+        opex_col: str = ("Output", "OPEX"),
+        totex_col: str = ("Output", "TOTEX"),
+        sort_by: str | None = ("Output", "TOTEX"),   # set None to keep original order
+        show_check: bool = True,
+        scenarios_to_plot: list | None = None,  # If none, plots all
+        destination_folder: str | None = None, 
+        filename: str | None = None
+    ):
+        """
+        df: one row per scenario, with columns for CAPEX, OPEX, TOTEX.
+        Produces stacked bars for CAPEX+OPEX and a line for TOTEX.
+        """
+
+        # --- basic validation
+        required = {capex_col, opex_col, totex_col}
+        missing = required - set(self.output.columns)
+        if missing:
+            raise ValueError(f"Missing columns: {missing}")
+        if scenarios_to_plot is not None:
+            d = self.output.loc[scenarios_to_plot, [capex_col, opex_col, totex_col]].copy()
+        else:
+            d = self.output.loc[:, [capex_col, opex_col, totex_col]].copy()
+        # optional sort
+        if sort_by is not None:
+            sort_col = {"CAPEX": capex_col, "OPEX": opex_col, "TOTEX": totex_col}.get(sort_by, sort_by)
+            d = d.sort_values(sort_col, ascending=True)
+
+        # --- (optional) check TO-TEX consistency
+        if show_check:
+            diff = (d[totex_col] - (d[capex_col] + d[opex_col])).abs()
+            # You can tighten/loosen this tolerance depending on units / rounding
+            if (diff > 1e-6).any():
+                bad = d.index[diff > 1e-6].tolist()
+                print(
+                    "Warning: TOTEX != CAPEX + OPEX for scenarios: "
+                    f"{bad}. (Might be fine if definitions differ.)"
+                )
+
+        # --- plot
+        sns.set_theme(style="whitegrid")
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        x = d.index.astype(str)
+        capex = d[capex_col].to_numpy()
+        opex = d[opex_col].to_numpy()
+        totex = d[totex_col].to_numpy()
+
+        # stacked bars
+        ax.bar(x, capex, label="CAPEX")
+        ax.bar(x, opex, label="OPEX")
+
+        ax.set_xlabel("Scenario")
+        ax.set_ylabel("System costs")
+        ax.tick_params(axis="x", rotation=30)
+        ax.plot(x, totex, marker="o", linewidth=2, color = 'black', label="TOTEX")
+
+        # combined legend (both axes)
+        ax.legend(loc="upper left", frameon=True)
+
+        plt.tight_layout()
+
+        if destination_folder is not None:
+            destination_filename = f'{filename}.png' if filename else 'Scenario-based cost analysis.png'
+            plt.savefig(os.path.join(destination_folder, destination_filename))
+
+    # ---------------------------
+    # Example usage:
+    # df = pd.DataFrame({
+    #     "scenario": ["Base", "High PV", "High Storage"],
+    #     "CAPEX": [1.2e6, 1.6e6, 1.9e6],
+    #     "OPEX":  [0.4e6, 0.3e6, 0.25e6],
+    #     "TOTEX": [1.6e6, 1.9e6, 2.15e6],
+    # })
+    # fig, axes = plot_costs_by_scenario(df)
+    # plt.show()
