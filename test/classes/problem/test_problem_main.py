@@ -56,8 +56,10 @@ def test_read_problem_parameters(problem_with_general_parameters):
     assert problem.solver == 'highs'
     assert problem.interest_rate == 0.07
     assert problem.simulation_horizon == 8760
-    assert problem.parameters["OCCURRANCE"].content == 1
     assert problem.parameters["TIME_STEP_DURATION"].content == 1
+    problem.generate_typical_periods()
+    assert problem.parameters["OCCURRANCE"].content == 1
+    
 
 
 def test_read_units_data(problem_with_unit_data):
@@ -109,12 +111,12 @@ def test_solve_ampl_problem(problem_with_all_data):
                         abs_tol = 1)
     
 def test_write_problem_output(solved_problem):
-    solved_problem.save_output()
+    solved_problem.process_output()
     # Here we check that the file was generated, and that it contains the right sheets
     for sheet in ['kpis', 'units', 'timeseries']:
         _ = pd.read_excel(
             os.path.join(solved_problem.problem_folder, 'Results', f"Results_{solved_problem.run_name}.xlsx"),
-            sheet_name = sheet
+            sheet_name = sheet 
         )
     assert True
 
@@ -150,10 +152,12 @@ def problem_with_general_parameters(problem_with_data):
 @pytest.fixture
 def problem_with_unit_data(problem_with_general_parameters):
     problem_with_general_parameters.read_units_data()
+    problem_with_general_parameters.generate_typical_periods()
     return problem_with_general_parameters
 
 @pytest.fixture
 def problem_with_all_data(problem_with_general_parameters):
+    problem_with_general_parameters.generate_typical_periods()
     problem_with_general_parameters.read_units_data()
     problem_with_general_parameters.parse_sets()
     problem_with_general_parameters.parse_parameters()

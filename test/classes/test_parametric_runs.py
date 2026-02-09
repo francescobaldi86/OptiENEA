@@ -45,13 +45,14 @@ def test_write_parametric_data_results(empty_problem):
 
 @pytest.fixture
 def empty_problem(tmp_path):
-    problem_folder = os.path.join(tmp_path, 'test_parametric_runs')
+    problem_name = 'test_problem'
+    problem_folder = os.path.join(tmp_path, problem_name)
     input_data_folder = os.path.join(problem_folder, 'Input')
     os.mkdir(problem_folder)
     os.mkdir(input_data_folder)
     for filename in ('units.yml', 'general.yml', 'timeseries_data.csv', 'Scenarios.xlsx'):
         shutil.copy2(os.path.join(__PARENT__, 'DATA', 'test_parametric_runs', filename), 
                      os.path.join(input_data_folder, filename))
-    problem = Problem(name = 'test_problem', 
+    problem = Problem(name = problem_name, 
                       problem_folder = problem_folder)
     yield problem

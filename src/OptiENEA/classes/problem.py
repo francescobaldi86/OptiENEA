@@ -17,7 +17,10 @@ from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.classes.parameter import Parameter
 from OptiENEA.classes.layer import Layer
 from OptiENEA.classes.amplpy import AmplProblem
-from OptiENEA.helpers.helpers import validate_project_structure, set_in_path
+from OptiENEA.classes.output import OptimizationOutput
+from OptiENEA.classes.typical_periods import *
+from typing import Optional, Sequence, Union
+from OptiENEA.helpers.helpers import validate_project_structure, set_in_path, key_dotted_to_tuple
 
 class Problem:
       name: str
@@ -33,8 +36,7 @@ class Problem:
       raw_general_data : dict | None
       objective: ObjectiveFunction | None
       ampl_problem: AmplProblem
-      has_typical_days: bool
-      number_of_typical_days: int
+      has_typical_periods: bool
       interpreter: str
       solver: str
       interest_rate: float
@@ -52,12 +54,10 @@ class Problem:
             self.temp_folder = temp_folder or os.path.join(self.problem_folder, 'Temporary files')
             self.input_folder = input_folder or os.path.join(self.problem_folder, 'Input')
             self.results_folder = results_folder or os.path.join(self.problem_folder, 'Results')
-            self
             self.units = {}
             self.sets = Set.create_empty_sets()
             self.parameters = Parameter.create_empty_parameters()
             self.layers = set()
-            self.number_of_typical_days: int
             self.interpreter = 'ampl'
             self.solver = 'highs'
             # Addiing ampl parameters
@@ -67,6 +67,7 @@ class Problem:
             self.raw_general_data = {}
             self.raw_unit_data = {}
             self.additional_constraints_data = {}
+            self.has_typical_periods = False
 
       def load_problem_data():
             """
@@ -81,6 +82,8 @@ class Problem:
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
             self.read_problem_parameters()
+            self.generate_typical_periods()  # If needed, generates the data about the typical periods
+            self.set_occurrance()
             self.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
             self.parse_sets()
             self.parse_parameters()
@@ -88,7 +91,7 @@ class Problem:
             self.create_ampl_model()  # Creates the problem mod file
             self.solve_ampl_problem()  # Solves the optimization problem
             # self.read_output()  # Reads the output generated
-            self.save_output()  # Saves the output into useful and readable data structures
+            self.process_output()  # Saves the output into useful and readable data structures
             # self.generate_plots()  # Generates required figures
 
       def create_folders(self):
@@ -115,20 +118,16 @@ class Problem:
                   self.raw_unit_data = yaml.safe_load(stream)
             with open(os.path.join(self.input_folder, 'general.yml'), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
-            try: 
+            if 'constraints.yml' in os.listdir(self.input_folder):
                   with open(os.path.join(self.input_folder, 'constraints.yml'), 'r') as stream:
                         self.additional_constraints_data = yaml.safe_load(stream)
-            except FileNotFoundError:
-                  pass
-            try:
+            if 'timeseries_data.csv' in os.listdir(self.input_folder):
                   self.raw_timeseries_data = pd.read_csv(
                         os.path.join(self.input_folder, 'timeseries_data.csv'), 
                         header = [0,1,2], 
                         index_col = 0, 
                         sep = ";")
-            except FileNotFoundError:
-                  pass
-                  # Requires logging
+
 
       def update_problem_data(self, type: str, path: tuple, value: float):
             """
@@ -142,7 +141,6 @@ class Problem:
                   case 'units':
                         self.raw_unit_data = set_in_path(self.raw_unit_data, path, value)
 
-     
       def read_problem_parameters(self):
             # Reads the problem's general data into the deidcated structure
             self.interpreter = self.raw_general_data['Settings']['Interpreter']
@@ -150,14 +148,65 @@ class Problem:
             # Addiing ampl parameters
             self.interest_rate = self.raw_general_data['Standard parameters']['Interest rate']
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
-            self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
+
             self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
             # self.output_variables = [x.strip() for x in self.raw_general_data['Settings']['Output variables'].split(',')]
             self.output_variables = Variable.load_variables_indexing_data(self.raw_general_data['Settings']['Output variables'])
-            # Checking if problem has typical days
-            # self.has_typical_days = True if len(self.parameters["OCCURRANCE"]) == 1 else False
-            # self.number_of_typical_days = len(self.parameters["OCCURRANCE"])
+            # Checking if problem has typical periods
+            self.has_typical_periods = True if 'Typical periods' in self.raw_general_data['Settings'].keys() else False
             self.objective = ObjectiveFunction(self.raw_general_data['Settings']['Objective'])
+
+      def generate_typical_periods(self):
+            if self.has_typical_periods == False:
+                  self.typical_periods = None
+            else:
+                  tp_param = self.raw_general_data['Settings']['Typical periods']
+                  tp_builder = TypicalPeriodBuilder(
+                        FeatureConfig(
+                              include_shape = True,
+                              include_level_mean = True,
+                              include_level_max = True,
+                              var_weights = tp_param['Weights'] if tp_param['Weights'] is not None else {},
+                              standardize=True),
+                        TypicalPeriodConfig(
+                              K = tp_param['Number of typical periods'] if 'Number of typical periods' in tp_param else 4,
+                              hours_per_period = tp_param['Hours per period'] if 'Hours per period' in tp_param.keys() else 24,
+                              energy_correction = tp_param['Energy correction'] if 'Energy correction' in tp_param.keys() else 'global',
+                              extreme_weight_mode = tp_param['Extreme weight mode'] if 'Extreme weight mode' in tp_param.keys() else 'deduct',
+                              extreme_selector = Problem.read_extreme_selector_data(tp_param['Extreme periods configuration']),
+                              random_state=1))
+                  print('Building typical periods...', end=' ')
+                  self.typical_periods = tp_builder.build(self.raw_timeseries_data)
+                  print('Done')
+                  self.typical_periods.to_yaml(path = os.path.join(self.temp_folder, 'typical_periods_data.yml'))
+      
+      @staticmethod
+      def read_extreme_selector_data(tp_param_extreme):
+            config = []
+            for extreme_config in tp_param_extreme:
+                  var_name = key_dotted_to_tuple(extreme_config['Variable'])
+                  match extreme_config['Type']:
+                        case 'peak':
+                              config.append(extreme_peak(var_name, take = 1))
+                        case 'min_sum':
+                              config.append(extreme_min_sum(var_name, take = 1))
+                        case 'max_sum':
+                              config.append(extreme_max_sum(var_name, take = 1))
+                        case 'netload_peak':
+                              config.append(extreme_netload_peak(var_name, take = 1))
+            return ExtremeSelector(config)
+      
+      def set_occurrance(self):
+            if self.has_typical_periods == False:
+                  self.parameters["OCCURRANCE"].content = self.raw_general_data['Standard parameters']['Occurrance']
+            else:
+                  self.tp_timeseries_data = self.typical_periods.to_ampl_params()
+                  self.parameters['OCCURRANCE'] = Parameter('OCCURRANCE', ['typicalPeriods'])
+                  self.parameters['OCCURRANCE'].content['typicalPeriods'] = np.arange(self.typical_periods.K)
+                  self.parameters['OCCURRANCE'].content['OCCURRANCE'] = np.array(self.typical_periods.weights, dtype=np.int32)
+                  self.parameters['OCCURRANCE'].content.set_index('typicalPeriods', inplace = True)
+
+
       
       def read_units_data(self):
             """
@@ -179,6 +228,7 @@ class Problem:
                   self.units[unit_name] = new_unit
                   self.layers = self.layers.union(new_unit.parse_layers())
       
+
       def load_unit(self, name: str, info: dict):
             match info['Type']:
                   case 'Process' | 'Process (producer)' | 'Process (demand)':
@@ -197,7 +247,13 @@ class Problem:
 
       def parse_sets(self):
             # NOTE: The append method is a method of the class "Set"
-            self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()))])
+            if not self.has_typical_periods:
+                  self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()))])
+            else:
+                  self.sets['typicalPeriods'].content.update([int(x) for x in range(self.typical_periods.K)])
+                  for tp in range(self.typical_periods.K):
+                        for ts in range(self.typical_periods.L):
+                              self.sets['timeStepsOfPeriod'].append(ts, tp)
             for layer in self.layers:
                   self.sets['layers'].append(layer.name)
             for unit_name, unit in self.units.items():
@@ -223,22 +279,29 @@ class Problem:
                   if isinstance(unit, Market):
                         self.sets['markets'].append(unit_name)
 
+
       def parse_parameters(self):
         # Parses data for the parameters
+            if not self.has_typical_periods:
+                  time_steps = np.arange(len(self.raw_timeseries_data.index))
+            else:
+                  typical_periods = np.repeat(np.arange(self.typical_periods.K), self.typical_periods.L)
+                  time_steps = np.tile(np.arange(self.typical_periods.L), self.typical_periods.K)
             for unit_name, unit in self.units.items():
                   if isinstance(unit, Process):
                         for layer in unit.layers:
                               if isinstance(unit.power[layer], pd.Series):
-                                    temp = pd.DataFrame(index = unit.power[layer].index, columns = self.parameters['POWER'].content.columns)
-                                    temp.loc[:, 'POWER'] = unit.power[layer]
-                                    temp.loc[:, 'processes'] = unit_name
-                                    temp.loc[:, 'layersOfUnit'] = layer
+                                    temp = pd.DataFrame(index = unit.power[layer].index)
                               else:
-                                    temp = pd.DataFrame(index = [x for x in range(self.simulation_horizon)], columns = self.parameters['POWER'].content.columns)
-                                    temp.loc[:, 'POWER'] = unit.power[layer]
-                                    temp.loc[:, 'processes'] = unit_name
-                                    temp.loc[:, 'layersOfUnit'] = layer
-                              temp.loc[:, 'timeSteps'] = temp.index
+                                    temp = pd.DataFrame(index = [x for x in range(self.simulation_horizon)])
+                              temp.loc[:, 'processes'] = unit_name      
+                              temp.loc[:, 'layersOfUnit'] = layer
+                              if not self.has_typical_periods:
+                                    temp.loc[:, 'timeSteps'] = time_steps
+                              else:
+                                    temp.loc[:, 'typicalDays'] = typical_periods
+                                    temp.loc[:, 'timeStepsOfPeriod'] = time_steps
+                              temp.loc[:, 'POWER'] = unit.power[layer]
                               self.parameters['POWER'].list_content.append(temp)
                   elif isinstance(unit, Utility):
                         self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
@@ -254,20 +317,28 @@ class Problem:
                               for layer in unit.layers:
                                     self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_installed_power[layer]})
                                     if unit.time_dependent_capacity_factor[layer] is not None:
-                                          temp = pd.DataFrame(index = unit.time_dependent_capacity_factor[layer].index, columns = self.parameters['POWER_MAX_REL'].content.columns)
-                                          temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor[layer]
+                                          temp = pd.DataFrame(index = unit.time_dependent_capacity_factor[layer].index)
                                           temp.loc[:, 'nonStorageUtilities'] = unit_name
                                           temp.loc[:, 'layersOfUnit'] = layer
-                                          temp.loc[:, 'timeSteps'] = temp.index
+                                          if not self.has_typical_periods:
+                                                temp.loc[:, 'timeSteps'] = time_steps
+                                          else:
+                                                temp.loc[:, 'typicalDays'] = typical_periods
+                                                temp.loc[:, 'timeStepsOfPeriod'] = time_steps
+                                          temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor[layer]
                                           self.parameters['POWER_MAX_REL'].list_content.append(temp)
                               if isinstance(unit, Market):
                                     self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
                                     if unit.energy_price_variation[layer]:
-                                          temp = pd.DataFrame(index = unit.energy_price_variation[layer].index, columns = self.parameters['ENERGY_PRICE_VARIATION'].content.columns)
-                                          temp.loc[:, 'ENERGY_PRICE_VARIATION'] = unit.energy_price_variation[layer]
-                                          temp.loc[:, 'nonStorageUtilities'] = unit_name
+                                          temp = pd.DataFrame(index = unit.energy_price_variation[layer].index)
+                                          temp.loc[:, 'markets'] = unit_name
                                           temp.loc[:, 'layersOfUnit'] = layer
-                                          temp.loc[:, 'timeSteps'] = temp.index
+                                          if not self.has_typical_periods:
+                                                temp.loc[:, 'timeSteps'] = time_steps
+                                          else:
+                                                temp.loc[:, 'typicalDays'] = typical_periods
+                                                temp.loc[:, 'timeStepsOfPeriod'] = time_steps
+                                          temp.loc[:, 'ENERGY_PRICE_VARIATION'] = unit.energy_price_variation[layer]
                                           self.parameters['ENERGY_PRICE_VARIATION'].list_content.append(temp)
                   else:
                         raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
@@ -282,6 +353,7 @@ class Problem:
                               parameter.content = pd.concat(parameter.list_content)
                         else:
                               parameter.content = pd.DataFrame(parameter.list_content)
+                        parameter.content = parameter.content.assign(**{param_name: parameter.content[param_name].astype(float)})  # Sets all parameter values to float, so to avoid data type issuse when re-setting the parameter value
                         parameter.content = parameter.content.set_index([x for x in parameter.content.columns if x != param_name])
 
       def update_problem_parameters(self, name, indexing, value):
@@ -329,85 +401,17 @@ class Problem:
                   for key, info in self.problem_data.objective.items():
                         self.objective = ObjectiveFunction(key, info)
 
-      def save_output(self):
-            output = {'kpis': [], 'units': pd.DataFrame(), 'timeseries': pd.DataFrame()}
-            for var_name, var_info in self.output_variables.items():
-                  if var_info.indexed_over == None:
-                        output['kpis'].append({'KPI': var_name, 'Value': self.ampl_problem.get_variable(var_name).value()})
-                  elif 'timeSteps' in var_info.indexed_over:
-                        temp = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
-                        temp.columns = [x.strip('.val') for x in temp.columns]
-                        temp = temp.unstack(level=[0, 1])
-                        # output['timeseries'] = temp.combine_first(output['timeseries'])
-                        output['timeseries'] = pd.concat([output['timeseries'], temp], axis = 1)
-                  elif 'nonmarketUtilities' in var_info.indexed_over:
-                        temp = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
-                        temp.columns = [x.strip('.val') for x in temp.columns]
-                        output['units'] = temp.combine_first(output['units'])
-                  else:
-                        output[var_name] = self.ampl_problem.get_variable(var_name).get_values().to_pandas()
-                        output[var_name].columns = [x.strip('.val') for x in output[var_name].columns]
-            output['timeseries_full'] = output['timeseries']
-            columns_to_drop = []
-            for column in output['timeseries'].columns:
-                  if (output['timeseries'][column] == 0).all():
-                        columns_to_drop.append(column)
-            output['timeseries'] = output['timeseries'].drop(columns=columns_to_drop, axis=1)
-            output['kpis'] = pd.DataFrame(output['kpis']).set_index('KPI')
-            with pd.ExcelWriter(os.path.join(self.results_folder, f"Results_{self.run_name}.xlsx"), engine="xlsxwriter") as writer:
-                  for sheet_name, df in output.items():
-                        if not df.empty:
-                              df.to_excel(writer, sheet_name=sheet_name, float_format = "%.3f")
+      
+      def process_output(self):
+            if not self.has_typical_periods:
+                  self.output = OptimizationOutput(self.ampl_problem, self.output_variables, self.results_folder)
+            else:
+                  self.output = OptimizationOutput(self.ampl_problem, self.output_variables, self.results_folder, self.typical_periods)
+            self.output.generate_output_structures()
+            self.output.save_output_to_excel(self.run_name)
 
 
 
 
     
             
-
-"""
-def set_problem_name(self):
-            # Set the folder of the "OptiENEA" toolbox, which is where this file is located
-            self.optienea_folder = os.getcwd() + "\\"
-            found = False
-            for file in os.listdir(self.optienea_folder + "Problems"):
-                  if file.endswith(".txt"):
-                        if file.startswith("UP_"):
-                              self.name = file[3:-4]
-                              found = True
-            if found:
-                  temp = read_input_from_file(dict(), self.optienea_folder + "Problems\\UP_" + self.name + ".txt")
-                  self.problem_folder = temp["Main"]
-                  if "Temp" in temp.keys():
-                        self.temp_problem_folder = temp["Temp"]
-            else:
-                  self.problem_folder, self.temp_problem_folder = GUI.get_problem_directories()
-            self.problem_folder = self.problem_folder + "\\"
-            if self.temp_problem_folder is not None:
-                  self.temp_problem_folder = self.temp_problem_folder + "\\"
-
-      def set_sim_folder(self):
-            date = datetime.now().strftime("%Y-%m-%d %Hh%M")
-            sim_folder_addend = self.name + " - " + self.simulation_name + " - " + date + "\\"
-            self.sim_folder = self.problem_folder + sim_folder_addend
-            print(self.sim_folder)
-            os.mkdir(self.sim_folder)
-            # If the information about a temporary folder is given, we create it. Otherwise not
-            if self.temp_problem_folder is not None:
-                  self.temp_folder = self.temp_problem_folder + sim_folder_addend
-                  os.mkdir(self.temp_folder)
-
-
-        def parse_problem_sets(self):
-            self.sets = {"0": dict(), "1": dict(), "2": dict()}
-            self.sets["0"]["timeSteps"] = list(
-                  [str(i) for i in range(1, int(self.general_parameters["NT"]) + 1)])
-            self.sets = parse_sets(self.sets, self.units)
-
-      def parse_problem_parameters(self):
-            for level in ["0", "1", "2", "3", "extra"]:
-                  if level not in self.parameters.keys():
-                        self.parameters[level] = dict()
-            self.parameters = parse_parameters(self)
-            
-"""

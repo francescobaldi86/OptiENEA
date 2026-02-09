@@ -1,6 +1,7 @@
 from OptiENEA.classes.layer import Layer
-from OptiENEA.helpers.helpers import safe_to_list
+from OptiENEA.helpers.helpers import safe_to_list, key_tuple_to_dotted
 import pandas as pd
+import numpy as np
 import os
 import yaml
 
@@ -27,7 +28,28 @@ class Unit:
         self.info = info
         self.problem = problem
         self.check_main_layer()
-        self.ts_data = problem.raw_timeseries_data.loc[:, (name)] if name in problem.raw_timeseries_data.columns else None   
+        self.convert_time_series_data()
+
+    def convert_time_series_data(self):
+        if not self.problem.has_typical_periods:
+            if self.name in self.problem.raw_timeseries_data.columns:
+                self.ts_data = pd.DataFrame(index = [x for x in range(len(self.problem.raw_timeseries_data.index))])
+                self.ts_data['timeSteps'] = [x for x in range(len(self.problem.raw_timeseries_data.index))]
+                for col in self.problem.raw_timeseries_data.columns:
+                    if col[0] == self.name:
+                        self.ts_data[key_tuple_to_dotted(col)] = self.problem.raw_timeseries_data[col]
+            else:
+                self.ts_data = None
+        else:
+            if self.name in self.problem.raw_timeseries_data.columns:
+                self.ts_data = pd.DataFrame(index = [x for x in range(self.problem.typical_periods.K * self.problem.typical_periods.L)])
+                self.ts_data['typicalPeriods'] = np.repeat(np.arange(self.problem.typical_periods.K), self.problem.typical_periods.L)
+                self.ts_data['timeSteps'] = np.tile(np.arange(self.problem.typical_periods.L), self.problem.typical_periods.K)
+                for var_name, profile in self.problem.typical_periods.profiles.items():
+                    if var_name[0] == self.name:
+                        self.ts_data[key_tuple_to_dotted(var_name)] = np.reshape(profile, -1)
+            else:
+                self.ts_data = None
     
     def check_default_values(self, unit_type):
         # Assigns default values for the specific unit type to the related fields
@@ -104,7 +126,7 @@ class Process(Unit):
                 if isinstance(power_info[0], float|int):
                     self.power[self.layers[0]] = self.info['Power']
                 elif power_info[0] == 'file':
-                    self.power[self.layers[0]] = self.ts_data.loc[:, ('Power', self.layers[0])]
+                    self.power[self.layers[0]] = self.ts_data.loc[:, f'{self.name}:Power:{self.layers[0]}']
                     self.has_time_dependent_power = True
                 else:
                     raise ValueError(f'The unit {self.name} only has one layer, so the input must be either a single value or the "file" string')    
@@ -116,7 +138,7 @@ class Process(Unit):
                     if isinstance(self.info['Power'][id], float|int):
                         self.power[layer] = self.info['Power'][id]
                     elif self.info['Power'][id] == 'file':
-                        self.power[layer] = self.ts_data.loc[:, ('Power', layer)]
+                        self.power[layer] = self.ts_data.loc[:, f'{self.name}:Power:{layer}']
                         self.has_time_dependent_power = True
                     else:
                         raise ValueError(f'The power input for unit {self.name} should be a list of either single values or the string "file"')
@@ -181,16 +203,17 @@ class Utility(Unit):
 
     def read_time_dependent_capacity_factor(self):
         if self.ts_data is not None:
-            if "Capacity factor" in [column[0] for column in self.ts_data.columns]:
+            real_column_names = [column for column in self.ts_data.columns if column not in {'typicalPeriods', 'timeSteps', 'timeStepsOfPeriod'}]
+            if "Capacity factor" in [column.split(':')[1] for column in real_column_names]:
                 self.time_dependent_capacity_factor = {}
                 self.has_time_dependent_power = True
-                if 'All layers' in [column[1] for column in self.ts_data.columns] and len(self.ts_data.loc[:, ('Capacity factor')] == 1):
+                if 'All layers' in [column.split(':')[2] for column in real_column_names] and len([column.split(':')[1] for column in real_column_names if column.split(':')[1] == 'Capacity factor']) == 1:
                     for layer in self.layers:
-                        self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', 'All layers')]
-                elif 'All layers' not in [column[1] for column in self.ts_data.columns]:
+                        self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, f'{self.name}:Capacity factor:All layers']
+                elif 'All layers' not in [column.split(':')[2] for column in real_column_names]:
                     for layer in self.layers:
-                        if layer in [column[1] for column in self.ts_data.columns]:
-                            self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, ('Capacity factor', layer)]
+                        if layer in [column.split(':')[2] for column in real_column_names]:
+                            self.time_dependent_capacity_factor[layer] = self.ts_data.loc[:, f'{self.name}:Capacity factor:{layer}']
                         else:
                             self.time_dependent_capacity_factor[layer] = None
                 else:
@@ -331,37 +354,37 @@ class Market(Utility):
         self.has_time_dependent_energy_prices = {l: False for l in self.layers}
         if self.ts_data is not None:
             for layer in self.layers:
-                if ('Price variation', layer) in self.ts_data.columns or ('Price', layer) in self.ts_data.columns:
+                if f'{self.name}:Price variation:{layer}' in self.ts_data.columns or f'{self.name}:Price:{layer}' in self.ts_data.columns:
                     self.has_time_dependent_energy_prices[layer] = True                    
         for id, layer in enumerate(self.layers):
             if self.has_time_dependent_energy_prices[layer] == False:
                 self.energy_price[layer] = self.info['Price'][id]
             else:
                 if 'Price' not in self.info.keys():
-                    self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
-                    self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]
-                elif isinstance(self.info['Price'][id], float | int) and ('Price variation', layer) in self.ts_data.columns: # Case 1: Price value and price variation
-                    average_price = self.ts_data.loc[:, ('Price variation', layer)].mean()
-                    maximum_price = self.ts_data.loc[:, ('Price variation', layer)].mean()
+                    self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
+                    self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]
+                elif isinstance(self.info['Price'][id], float | int) and f'{self.name}:Price variation:{layer}' in self.ts_data.columns: # Case 1: Price value and price variation
+                    average_price = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}'].mean()
+                    maximum_price = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}'].max()
                     if round(average_price, 1) == 1.0 or round(maximum_price,1) == 1.0:
                         self.energy_price[layer] = self.info['Price'][id]
-                        self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price variation', layer)]
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}']
                     else:
                         raise ValueError(f'Time series and price values for market {self.name} are not consistent. The time series for price variation will be multiplied by the reference price, so it should be either a value with mean = 1 or with max = 1')
-                elif isinstance(self.info['Price'][id], float | int) and ('Price', layer) in self.ts_data.columns:  # Case 2: price value and "Price" column
-                    average_price = self.ts_data.loc[:, ('Price', layer)].mean()
-                    maximum_price = self.ts_data.loc[:, ('Price', layer)].mean()
+                elif isinstance(self.info['Price'][id], float | int) and f'{self.name}:Price:{layer}' in self.ts_data.columns:  # Case 2: price value and "Price" column
+                    average_price = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
+                    maximum_price = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].max()
                     if round(average_price, 1) == 1.0 or round(maximum_price,1) == 1.0:
                         self.energy_price[layer] = self.info['Price'][id]
-                        self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']
                         Warning(f'Attention! For market unit {self.name} you provided both a fixed price and a time-dependent "Price". The latter has average 1, so it will be considered as adimensional')
                     else:
-                        self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
-                        self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]    
+                        self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
+                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]    
                         Warning(f'Market unit {self.name} was provided both with a fixed and a time-dependent price "Price". The fixed value will be ignored')
                 elif self.info['Price'][id] == 'file':
-                    self.energy_price[layer] = self.ts_data.loc[:, ('Price', layer)].mean()
-                    self.energy_price_variation[layer] = self.ts_data.loc[:, ('Price', layer)]/self.energy_price[layer]
+                    self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
+                    self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]
                 else:
                     raise ValueError(f'The "Price" should be a list of float or include the "file" value. {self.info["Price"]} was provided for unit {self.name}')
 

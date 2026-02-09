@@ -70,7 +70,7 @@ def test_problem_3(tmp_path):
                       problem_folder = problem_folder)
     problem.run()
     assert problem.ampl_problem.solve_result == "solved"
-    assert math.isclose(problem.ampl_problem.get_variable('OPEX').value(), 69, abs_tol = 10)
+    assert math.isclose(problem.ampl_problem.get_variable('OPEX').value(), 54, abs_tol = 10)
     assert math.isclose(problem.ampl_problem.get_variable('CAPEX').value(), 1030, abs_tol = 10)
-    assert math.isclose(problem.ampl_problem.get_variable('TOTEX').value(),1098,abs_tol = 10)
+    assert math.isclose(problem.ampl_problem.get_variable('TOTEX').value(),1083,abs_tol = 10)
     assert True

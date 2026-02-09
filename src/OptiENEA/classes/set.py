@@ -19,7 +19,7 @@ class Set:
             
 
     def append(self, value, subset: str | None = None):
-        if not subset:
+        if subset is None:
             self.content.add(value)
         else:
             self.content[subset].add(value)

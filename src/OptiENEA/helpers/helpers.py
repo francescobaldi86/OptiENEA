@@ -183,3 +183,9 @@ def set_in_path(d, path, value):
         current = current[key]
     current[path[-1]] = value
     return d
+
+def key_dotted_to_tuple(dotted_key):
+    return tuple(dotted_key.split(':'))
+
+def key_tuple_to_dotted(tuple_key):
+    return ':'.join(tuple_key)
