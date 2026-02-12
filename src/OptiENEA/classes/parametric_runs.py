@@ -2,7 +2,7 @@ from OptiENEA.classes.problem import Problem
 from OptiENEA.helpers.helpers import validate_project_structure
 import pandas as pd
 import numpy as np
-import os
+import os, amplpy
 from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -56,45 +56,51 @@ class ParametricRuns():
                     self.scenarios_description.loc[scenario, param] = self.scenarios_description.loc[baseline_scenario, param]
         self.scenarios_description.insert(0, 'Run name', 'temp')
 
-    def run(self):
+    def run(self, solve_ampl_problem: bool = True, process_output: bool = True):
         # Runs the scenarios loaded
         print(f'Start running parametric test "{self.name}"')
         self.problem.create_folders()
         self.create_folders()
         parameters_to_update = self.check_parameters_to_update()
-        
         for scenario in self.scenarios_description.index:
-            problem = Problem(
+            problem = self.generate_scenario_files(scenario, parameters_to_update)
+            if solve_ampl_problem:
+                print(f'Starting solving problem {problem.name} in scenario # {scenario}')
+                problem.solve_ampl_problem()  # Solves the optimization problem
+                print('Solution completed!')
+            if process_output:
+                problem.process_output()  # Saves the output into useful and readable data structures
+        self.generate_summary_output_file()            
+
+
+    def generate_scenario_files(self, scenario, parameters_to_update):
+        problem = Problem(
                 name = self.problem.name, 
                 problem_folder = self.problem.problem_folder,
                 temp_folder = os.path.join(self.parametric_runs_temp_folder, f'Scenario {scenario}'),
                 results_folder = os.path.join(self.parametric_runs_results_folder)
                 )
-            validate_project_structure(problem.problem_folder)
-            problem.create_folders()  # Creates the project folders
-            problem.read_problem_data()  # Reads problem general data and data about units
-            # This part updates "raw" values
-            self.update_raw_parameters(parameters_to_update['Raw'], problem, scenario)
-            problem.read_problem_parameters()
-            if self.typical_periods is None:
-                problem.generate_typical_periods()  # If needed, generates the data about the typical periods
-                self.typical_periods = problem.typical_periods
-            else:
-                problem.typical_periods = self.typical_periods
-            problem.set_occurrance()
-            problem.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
-            problem.parse_sets()
-            problem.parse_parameters()
-            # This part updates "final" parameters
-            self.update_problem_parameters(parameters_to_update['Problem'], problem, scenario)
-            run_name = f'Scenario {scenario}'  # f'Scenario {scenario} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
-            self.scenarios_description.loc[scenario, ('Run name','-','-','-')] = run_name
-            problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
-            print(f'Starting solving problem {problem.name} in scenario # {scenario}')
-            problem.solve_ampl_problem()  # Solves the optimization problem
-            print('Solution completed!')
-            problem.process_output()  # Saves the output into useful and readable data structures
-        self.generate_summary_output_file()
+        validate_project_structure(problem.problem_folder)
+        problem.create_folders()  # Creates the project folders
+        problem.read_problem_data()  # Reads problem general data and data about units
+        # This part updates "raw" values
+        self.update_raw_parameters(parameters_to_update['Raw'], problem, scenario)
+        problem.read_problem_parameters()
+        if self.typical_periods is None:
+            problem.generate_typical_periods()  # If needed, generates the data about the typical periods
+            self.typical_periods = problem.typical_periods
+        else:
+            problem.typical_periods = self.typical_periods
+        problem.set_occurrance()
+        problem.read_units_data()  # Uses the problem data read before and saves them in the appropriate format
+        problem.parse_sets()
+        problem.parse_parameters()
+        # This part updates "final" parameters
+        self.update_problem_parameters(parameters_to_update['Problem'], problem, scenario)
+        run_name = f'Scenario {scenario}'  # f'Scenario {scenario} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
+        self.scenarios_description.loc[scenario, ('Run name','-','-','-')] = run_name
+        problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
+        return problem
 
     def create_folders(self):
         try:
