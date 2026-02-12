@@ -156,8 +156,8 @@ class ParametricRuns():
     def update_raw_parameters(self, raw_parameters_to_update, problem, scenario):
         for param in raw_parameters_to_update:
             for data_type in ('units', 'general'):
-                if data_type in param[0]:
-                    path = [x for x in param[1:] if x != '-']
+                if data_type in param[1]:
+                    path = [x for x in param[2:] if x != '-']
                     problem.update_problem_data(data_type, path, self.scenarios_description.loc[scenario, param])
         return problem
     

@@ -183,17 +183,18 @@ class Problem:
       @staticmethod
       def read_extreme_selector_data(tp_param_extreme):
             config = []
-            for extreme_config in tp_param_extreme:
-                  var_name = key_dotted_to_tuple(extreme_config['Variable'])
-                  match extreme_config['Type']:
-                        case 'peak':
-                              config.append(extreme_peak(var_name, take = 1))
-                        case 'min_sum':
-                              config.append(extreme_min_sum(var_name, take = 1))
-                        case 'max_sum':
-                              config.append(extreme_max_sum(var_name, take = 1))
-                        case 'netload_peak':
-                              config.append(extreme_netload_peak(var_name, take = 1))
+            if tp_param_extreme:
+                  for extreme_config in tp_param_extreme:
+                        var_name = key_dotted_to_tuple(extreme_config['Variable'])
+                        match extreme_config['Type']:
+                              case 'peak':
+                                    config.append(extreme_peak(var_name, take = 1))
+                              case 'min_sum':
+                                    config.append(extreme_min_sum(var_name, take = 1))
+                              case 'max_sum':
+                                    config.append(extreme_max_sum(var_name, take = 1))
+                              case 'netload_peak':
+                                    config.append(extreme_netload_peak(var_name, take = 1))
             return ExtremeSelector(config)
       
       def set_occurrance(self):
