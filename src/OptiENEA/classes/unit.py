@@ -2,8 +2,7 @@ from OptiENEA.classes.layer import Layer
 from OptiENEA.helpers.helpers import safe_to_list, key_tuple_to_dotted
 import pandas as pd
 import numpy as np
-import os
-import yaml
+import os, yaml, numbers
 
 with open(f'{os.path.dirname(os.path.realpath(__file__))}\\..\\lib\\units_default_values.yml') as stream:
     UNITS_DEFAULT_DATA = yaml.safe_load(stream)
@@ -192,7 +191,7 @@ class Utility(Unit):
     
     def read_max_installed_power(self):
         if self.info['Type'] not in {'StorageUnit', 'ChargingUnit', 'DischargingUnit'}:
-            if isinstance(self.info['Max installed power'], float) | isinstance(self.info['Max installed power'], int):
+            if isinstance(self.info['Max installed power'], numbers.Number):
                 if len(self.layers) == 1:
                     self.max_installed_power[self.layers[0]] = self.info['Max installed power']
                 else:
