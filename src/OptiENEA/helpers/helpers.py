@@ -162,8 +162,9 @@ def handle_remove_readonly(func, path, exc_info):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
-def safe_rmtree(path, retries=3, delay=0.1):
-    for i in range(retries):
+def safe_rmtree(path, timeout=3, delay=0.1):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
         try:
             shutil.rmtree(path, onerror=handle_remove_readonly)
             return
@@ -189,3 +190,12 @@ def key_dotted_to_tuple(dotted_key):
 
 def key_tuple_to_dotted(tuple_key):
     return ':'.join(tuple_key)
+
+def attempt_to_order_results_files(file_list, basic_filename):
+    # This function takes a list of result files and tries to sort them
+    file_list_sorted = [f'{basic_filename} {x}.xlsx' for x in range(len(file_list))]
+    for filename in file_list_sorted:
+        if filename not in file_list:
+            print('Could not sort results file list based on the current sorting approach')
+            return file_list
+    return file_list_sorted

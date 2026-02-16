@@ -1,11 +1,12 @@
 from OptiENEA.classes.problem import Problem
-from OptiENEA.helpers.helpers import validate_project_structure
+from OptiENEA.helpers.helpers import validate_project_structure, attempt_to_order_results_files
 import pandas as pd
 import numpy as np
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
+from typing import List, Tuple, Dict
 
 """
 This class is made to provide support for parametric runs
@@ -103,7 +104,7 @@ class ParametricRuns():
         except FileExistsError:
             pass
 
-    def generate_summary_output_file(self, results_folder: str | None = None):
+    def generate_summary_output(self, results_folder: str | None = None, generate_output_xlsx: bool = True):
         """
         This method creates a summary output file by reading the output
         """
@@ -121,6 +122,7 @@ class ParametricRuns():
         # Identifying result files
         file_list = [f for f in os.listdir(self.parametric_runs_results_folder) if os.path.isfile(os.path.join(self.parametric_runs_results_folder, f))]
         file_list = [f for f in file_list if (('Results' in f) and ('.xlsx' in f))]
+        file_list = attempt_to_order_results_files(file_list, 'Results_Scenario')
         for scenario, results_filename in enumerate(file_list):
             temp_output_kpis, temp_output_units = self.read_optimization_output_files(results_filename)
             if (temp_output_kpis is not None) and (temp_output_units is not None):
@@ -130,8 +132,108 @@ class ParametricRuns():
                     else:
                         temp_kpi.loc[scenario, kpi] = temp_output_units.loc[kpi[1].split(':')[1], kpi[1].split(':')[0]]
         self.output = self.output.combine_first(temp_kpi)
-        self.output.to_excel(os.path.join(self.parametric_runs_results_folder, f'{self.name}_parametric_results.xlsx'))
+        if generate_output_xlsx:
+            self.output.to_excel(os.path.join(self.parametric_runs_results_folder, f'{self.name}_parametric_results.xlsx'))
         return self.output
+
+    def generate_summary_output_flows(self, 
+                                    flows: Dict[str, Tuple],
+                                    results_folder: str | None = None,
+                                    destination_folder: str | None = None,
+                                    scenarios_to_plot: List | None = None,
+                                    clusters: Dict[str, Tuple] | None = None,
+                                    has_locations: bool = False,
+                                    generate_output_csv: bool = True):
+        """
+        Generates a summary of energy flows across different scenarios.
+        
+        This function processes optimization results to extract and summarize energy flow data
+        for specified scenarios. It can handle both location-specific and general energy flows,
+        and provides options for normalization and clustering of scenarios.
+
+        Parameters:
+        -----------
+        flows : Dict[str, Tuple]
+            Dictionary mapping flow names to tuples containing flow identifiers.
+            Each tuple should contain (unit, flow_type) identifiers.
+        results_folder : str | None, optional
+            Path to folder containing optimization results. If None, uses default results folder.
+        destination_folder : str | None, optional
+            Path to save output files. If None, output is not saved.
+        scenarios_to_plot : List | None, optional
+            List of scenario indices to include in the analysis. If None, all scenarios are included.
+        clusters : Dict[str, Tuple] | None, optional
+            Dictionary mapping cluster names to tuples of scenario indices in each cluster.
+        normalize : bool, optional
+            If True, normalizes flow values so each scenario sums to 100%.
+        has_locations : bool, optional
+            If True, extracts location information from flow identifiers.
+        generate_output_xlsx : bool, optional
+            If True, generates an Excel file with the summarized flow data.
+
+        Returns:
+        --------
+        pd.DataFrame
+            DataFrame containing summarized flow data with columns:
+            - 'Energy vector': Name of the energy flow
+            - 'Location': Location identifier (if has_locations=True)
+            - 'Scenario': Scenario index
+            - 'Value': Absolute sum of flow values
+            - 'Cumulative': Cumulative sum of flow values
+            - 'Cluster': Cluster name (if clusters provided)
+
+        Notes:
+        ------
+        - The function assumes optimization results are stored in Excel files with 'timeseries_full' sheet.
+        - Flow identifiers should follow the format ('power', unit, flow_type) in the results files.
+        - For location extraction, flow_type is expected to contain location information when has_locations=True.
+        """
+        # Getting time series data
+        # Identifying result files
+        if not results_folder:
+            results_folder = self.parametric_runs_results_folder
+        file_list = [f for f in os.listdir(results_folder) if os.path.isfile(os.path.join(results_folder, f))]
+        file_list = [f for f in file_list if (('Results' in f) and ('.xlsx' in f))]
+        file_list = attempt_to_order_results_files(file_list, 'Results_Scenario')
+        if scenarios_to_plot:
+            file_list = [filename for id, filename in enumerate(file_list) if id in scenarios_to_plot]
+        else:
+            scenarios_to_plot = [x for x in range(len(file_list))]
+        df = pd.DataFrame(columns = ['Energy vector', 'Location', 'Scenario', 'Value'], index = [x for x in range(len(file_list) * len(flows))])
+        counter = 0
+        for scenario_id, filename in enumerate(file_list):
+            cumulative_energy_demand = 0
+            temp = pd.read_excel(
+                os.path.join(results_folder, filename),
+                'timeseries_full',
+                header = [0,1,2], 
+                index_col = 0,
+                )
+            for flow_name, flow in flows.items():
+                col = ('power', flow[0], flow[1])
+                if has_locations:
+                    aaa = flow[1].split('_')
+                    if len(aaa) == 1:
+                        ev = aaa[0]
+                        loc = flow[0].split('_')[1]
+                    else:
+                        ev = aaa[0]
+                        loc = aaa[1]
+                else:
+                    ev, loc = flow[1], None
+                df.loc[counter, 'Location'] = loc
+                df.loc[counter, 'Energy vector'] = flow_name
+                df.loc[counter, 'Scenario'] = scenario_id
+                df.loc[counter, 'Value'] = temp[col].abs().sum()
+                cumulative_energy_demand += df.loc[counter, 'Value']
+                df.loc[counter, 'Cumulative'] = cumulative_energy_demand
+                if clusters:
+                    df.loc[counter, 'Cluster'] = [k for k, v in clusters.items() if scenario_id in v][0]
+                counter += 1
+        if generate_output_csv:
+            df.to_csv(os.path.join(destination_folder, 'energy_demand_summary.csv'), 
+                      index = False, sep = ';')
+        return df
 
         
     def scenarios_to_run(self, scenarios_to_run: str = 'all'):
@@ -188,7 +290,7 @@ class ParametricRuns():
         capex_col: str = ("Output", "CAPEX"),
         opex_col: str = ("Output", "OPEX"),
         totex_col: str = ("Output", "TOTEX"),
-        sort_by: str | None = ("Output", "TOTEX"),   # set None to keep original order
+        sort_by: str | None = None,  # set None to keep original order 
         show_check: bool = True,
         scenarios_to_plot: list | None = None,  # If none, plots all
         destination_folder: str | None = None, 
@@ -241,7 +343,7 @@ class ParametricRuns():
         ax.set_xlabel("Scenario")
         ax.set_ylabel("System costs")
         ax.tick_params(axis="x", rotation=30)
-        ax.plot(x, totex, marker="o", linewidth=2, color = 'black', label="TOTEX")
+        ax.plot(x, totex, marker="x", linewidth=0, color = 'black', label="TOTEX")
 
         # combined legend (both axes)
         ax.legend(loc="upper left", frameon=True)
@@ -252,13 +354,106 @@ class ParametricRuns():
             destination_filename = f'{filename}.png' if filename else 'Scenario-based cost analysis.png'
             plt.savefig(os.path.join(destination_folder, destination_filename))
 
-    # ---------------------------
-    # Example usage:
-    # df = pd.DataFrame({
-    #     "scenario": ["Base", "High PV", "High Storage"],
-    #     "CAPEX": [1.2e6, 1.6e6, 1.9e6],
-    #     "OPEX":  [0.4e6, 0.3e6, 0.25e6],
-    #     "TOTEX": [1.6e6, 1.9e6, 2.15e6],
-    # })
-    # fig, axes = plot_costs_by_scenario(df)
-    # plt.show()
+
+    def plot_yearly_cumulated_flows(
+            self,
+            flows: Dict[str, Tuple],
+            results_folder: str | None = None,
+            destination_folder: str | None = None,
+            scenarios_to_plot: List | None = None,
+            clusters: Dict[str, Tuple] | None = None,
+            normalize: bool = False,
+            has_locations: bool = False,
+        ):
+        """
+        flows:          dictionary of tuples, where each two-elements tuple provides the second and third level indeces of the selected flow (usually unit and flow type)
+        clusters:       dictionary of tuples to assign scenarios to clusters. Each tuple contains all scenario IDs belonging to the selected cluster. The key will be displayed on the figure
+        scenarios_to_plot: tuple with all scenarios we want to plot
+        normalize:      boolean. If True, results shown are normlized so that each bar sums to 100%
+        has_locations:  boolean. If True, The hatches will be applied to allow the user to distinguish between locations
+        """
+        # Getting time series data
+        # Identifying result files
+        if not results_folder:
+            results_folder = self.parametric_runs_results_folder
+        file_list = [f for f in os.listdir(results_folder) if os.path.isfile(os.path.join(results_folder, f))]
+        file_list = [f for f in file_list if (('Results' in f) and ('.xlsx' in f))]
+        file_list = attempt_to_order_results_files(file_list, 'Results_Scenario')
+        if scenarios_to_plot:
+            file_list = [filename for id, filename in enumerate(file_list) if id in scenarios_to_plot]
+        else:
+            scenarios_to_plot = [x for x in range(len(file_list))]
+        df = pd.DataFrame(columns = ['Energy vector', 'Location', 'Scenario', 'Value'], index = [x for x in range(len(file_list) * len(flows))])
+        counter = 0
+        for scenario_id, filename in enumerate(file_list):
+            cumulative_energy_demand = 0
+            temp = pd.read_excel(
+                os.path.join(results_folder, filename),
+                'timeseries_full',
+                header = [0,1,2], 
+                index_col = 0,
+                )
+            for flow_name, flow in flows.items():
+                col = ('power', flow[0], flow[1])
+                if has_locations:
+                    aaa = flow[1].split('_')
+                    if len(aaa) == 1:
+                        ev = aaa[0]
+                        loc = flow[0].split('_')[1]
+                    else:
+                        ev = aaa[0]
+                        loc = aaa[1]
+                else:
+                    ev, loc = flow[1], None
+                df.loc[counter, 'Location'] = loc
+                df.loc[counter, 'Energy vector'] = flow_name
+                df.loc[counter, 'Scenario'] = scenario_id
+                df.loc[counter, 'Value'] = temp[col].abs().sum()
+                cumulative_energy_demand += df.loc[counter, 'Value']
+                df.loc[counter, 'Cumulative'] = cumulative_energy_demand
+                if clusters:
+                    df.loc[counter, 'Cluster'] = [k for k, v in clusters.items() if scenario_id in v][0]
+                counter += 1
+        
+        df = self.generate_summary_output_flows(flows, results_folder, destination_folder, scenarios_to_plot, clusters)
+        df.pivot(index = ['Energy vector'], columns = "Scenario", values = 'Value').reset_index().to_excel(os.path.join(destination_folder, 'Yearly summary energy flows.xlsx'))
+
+        # Generate the empty figure
+        fig, ax = plt.subplots(figsize=(max(10, 0.45 * len(file_list)), 6))
+        x = range(len(file_list))
+        # Recursively plot
+        for i, g in enumerate(df.groupby("Energy vector")):
+            ax = sns.catplot(data=g[1],
+                            kind = 'bar',
+                            x="Scenario",
+                            y="Cumulative",
+                            hue="Energy vector",
+                            palette = 'dark',
+                            # zorder=-i, # so first bars stay on top
+                            edgecolor="k")
+        # ax.legend_.remove() # remove the redundant legends 
+
+        # Background hatching per location (not color-based)
+        if has_locations:
+            hatch_map = {}
+            default_hatches = ["////", "\\\\", "....", "xx", "++", "--", "oo", "**"]
+            locs = df["Location"].unique().tolist()
+            for i, loc in enumerate(locs):
+                hatch_map.setdefault(loc, default_hatches[i % len(default_hatches)])
+
+        # # draw background bands (transparent fill + hatch)
+        # for i, (sc, loc) in enumerate(zip(df["scenario"], df["location_id"])):
+        #     ax.axvspan(i - 0.5, i + 0.5, facecolor="none", edgecolor="0.85", hatch=hatch_map[loc], linewidth=0)
+
+        # ax.set_xticks(list(x))
+        # ax.set_xticklabels(df["Scenario"], rotation=90)
+        # ax.set_ylabel("Yearly cumulated flow")
+        # ax.set_title("Yearly cumulated flows by scenario (stacked), clustered, with location background hatch")
+        # ax.legend(ncol=2, fontsize=9, frameon=True)
+
+        plt.tight_layout()
+        if destination_folder is not None:
+            destination_filename = 'Energy flows.png'
+            plt.savefig(os.path.join(destination_folder, destination_filename))
+
+    
