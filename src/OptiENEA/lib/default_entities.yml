@@ -8,6 +8,7 @@ SETS:
   storageUnits:
   unitsWithMinimumSizeIfInstalled:
   unitsOnOff:
+  unitsEligibleForTaxDeduction:
   timeStepsOfPeriod:
     - typicalPeriods
   layersOfUnit:
@@ -18,10 +19,15 @@ SETS:
     - storageUnits
   dischargingUtilitiesOfStorageUnit:
     - storageUnits
+  
 PARAMETERS:
   OCCURRANCE:
   TIME_STEP_DURATION:
   STORAGE_CYCLIC_ACTIVE:
+  TAX_DEDUCTION:
+  YEARS_FOR_TAX_DEDUCTION:
+  SPECIFIC_INVESTMENT_COST: 
+    - utilities
   SPECIFIC_INVESTMENT_COST_ANNUALIZED: 
     - utilities
   POWER_MIN:

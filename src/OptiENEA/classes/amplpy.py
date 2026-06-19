@@ -69,6 +69,9 @@ class AmplProblem(amplpy.AMPL):
         # Check if the problem has units that can only be operated on an on/off basis
         if len(self.problem.sets['unitsOnOff'].content) > 0:
             self.has_units_operated_only_on_off = True
+        # Check if the problem has units that are eligible for tax deduction
+        if len(self.problem.sets['unitsEligibleForTaxDeduction'].content) > 0:
+            self.has_units_eligible_for_tax_deduction = True
         # Check if problem has typical periods
         if self.problem.has_typical_periods:
             self.has_typical_periods = True
@@ -109,6 +112,8 @@ class AmplProblem(amplpy.AMPL):
             temp_sets.insert(idx-1, "set storageUnits;")
         if self.has_units_with_minimum_size_if_installed:
             temp_sets.append("set unitsWithMinimumSizeIfInstalled within nonmarketUtilities;")
+        if self.has_units_eligible_for_tax_deduction:
+            temp_sets.append("set unitsEligibleForTaxDeduction within nonmarketUtilities;")
         if self.has_units_operated_only_on_off:
             temp_sets.append("set unitsOnOff within nonmarketUtilities;")
         self.mod_string += "\n".join(temp_sets) + "\n\n\n"
@@ -122,6 +127,7 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param TIME_STEP_DURATION;")
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
+        temp_params.append("param SPECIFIC_INVESTMENT_COST{u in utilities} default 0;")
         temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
         temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
@@ -139,6 +145,9 @@ class AmplProblem(amplpy.AMPL):
             temp_params[idy] = "param POWER_MAX_REL{u in nonStorageUtilities, l in layersOfUnit[u], t in timeSteps} default 1;"
         if self.has_units_with_minimum_size_if_installed:
             temp_params.append("param SIZE_MIN_IF_INSTALLED{u in unitsWithMinimumSizeIfInstalled} default 0;")
+        if self.has_units_eligible_for_tax_deduction:
+            temp_params.append("param TAX_DEDUCTION default 0 <= 1;")
+            temp_params.append("param YEARS_FOR_TAX_DEDUCTION default 1;")
         self.mod_string += "\n".join(temp_params) + "\n\n\n"
         
     def write_variables(self):
@@ -175,7 +184,10 @@ class AmplProblem(amplpy.AMPL):
         # Adds the problem constraints to the mod file string
         temp_constraints = []
         temp_constraints.append("/* CONSTRAINTS */\n")
-        temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
+        if self.has_units_eligible_for_tax_deduction:
+            temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l] - sum{u in unitsEligibleForTaxDeduction} size[u] * SPECIFIC_INVESTMENT_COST[u] * TAX_DEDUCTION / YEARS_FOR_TAX_DEDUCTION;")
+        else:
+            temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
         temp_constraints.append("s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;")
         temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = -POWER[p,l,t];")
         # Constraints to be added depending on whether we are calculating the cost of the investment or not

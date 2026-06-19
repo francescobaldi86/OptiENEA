@@ -150,6 +150,8 @@ class Problem:
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
 
             self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
+            self.parameters["TAX_DEDUCTION"].content = self.raw_general_data['Standard parameters']['Tax deduction'] if 'Tax deduction' in self.raw_general_data['Standard parameters'].keys() else 0.0
+            self.parameters["YEARS_FOR_TAX_DEDUCTION"].content = self.raw_general_data['Standard parameters']['Years for tax deduction'] if 'Years for tax deduction' in self.raw_general_data['Standard parameters'].keys() else 1.0
             # self.output_variables = [x.strip() for x in self.raw_general_data['Settings']['Output variables'].split(',')]
             self.output_variables = Variable.load_variables_indexing_data(self.raw_general_data['Settings']['Output variables'])
             # Checking if problem has typical periods
@@ -269,6 +271,8 @@ class Problem:
                               self.sets['unitsWithMinimumSizeIfInstalled'].append(unit_name)
                         if unit.can_only_be_operated_on_off:
                               self.sets['unitsOnOff'].append(unit_name)
+                        if unit.eligible_for_tax_deduction:
+                              self.sets['unitsEligibleForTaxDeduction'].append(unit_name)
                   if isinstance(unit, StorageUnit):
                         self.sets['storageUnits'].append(unit_name)
                   if isinstance(unit, ChargingUnit):
@@ -306,6 +310,7 @@ class Problem:
                               self.parameters['POWER'].list_content.append(temp)
                   elif isinstance(unit, Utility):
                         self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
+                        self.parameters['SPECIFIC_INVESTMENT_COST'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST': unit.specific_capex})
                         if unit.has_minimum_installed_power:
                               self.parameters['POWER_MIN'].list_content.append({'utilities': unit_name, 'POWER_MIN': unit.minimum_installed_power})
                         if unit.has_minimum_size_if_installed:

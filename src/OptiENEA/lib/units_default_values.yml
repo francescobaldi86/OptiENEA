@@ -14,6 +14,7 @@ Utility:
   Min installed power: 0
   Min size if installed: 0
   OnOff utility: False
+  Eligible for tax deduction: False
 
 StorageUnit:
   Max energy: 10000000

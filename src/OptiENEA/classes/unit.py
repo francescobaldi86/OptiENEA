@@ -177,6 +177,7 @@ class Utility(Unit):
         self.can_only_be_operated_on_off = self.info['OnOff utility']
         self.max_installed_power = {l: 0 for l in self.layers}
         self.time_dependent_capacity_factor = {l: None for l in self.layers}
+        self.eligible_for_tax_deduction = self.info['Eligible for tax deduction']
         self.calculate_annualized_capex(self.problem.interest_rate)
         self.read_max_installed_power()
         self.read_time_dependent_capacity_factor()
@@ -186,6 +187,7 @@ class Utility(Unit):
         if isinstance(self.specific_capex, list):
             # If the data about the specific capex is a list, the calculation is done differently
             self.specific_annualized_capex = sum([self.specific_capex[i] / Utility.calculate_annualization_factor(self.lifetime[i], interest_rate) for i in range(len(self.lifetime))])
+            self.specific_capex = sum([self.specific_capex[i] for i in range(len(self.lifetime))])
         else:
             self.specific_annualized_capex = self.specific_capex / Utility.calculate_annualization_factor(self.lifetime, interest_rate)
     
