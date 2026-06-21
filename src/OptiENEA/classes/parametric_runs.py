@@ -95,7 +95,8 @@ class ParametricRuns():
             problem.solve_ampl_problem()  # Solves the optimization problem
             print('Solution completed!')
             problem.process_output()  # Saves the output into useful and readable data structures
-        self.generate_summary_output_file()
+        self.generate_summary_output()
+        # self.generate_summary_output_flows()
 
     def create_folders(self):
         try:
