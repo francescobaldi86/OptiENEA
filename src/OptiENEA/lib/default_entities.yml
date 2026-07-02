@@ -38,6 +38,8 @@ PARAMETERS:
     - storageUnits
   ERATE:
     - storageUnits
+  STORAGE_LOSSES:
+    - storageUnits
   ENERGY_MAX:
     - storageUnits
   POWER_MAX:

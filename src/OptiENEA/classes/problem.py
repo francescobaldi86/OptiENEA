@@ -319,6 +319,7 @@ class Problem:
                               self.parameters['ENERGY_MAX'].list_content.append({'storageUnits': unit_name, 'ENERGY_MAX': unit.max_energy})
                               self.parameters['CRATE'].list_content.append({'storageUnits': unit_name, 'CRATE': unit.c_rate})
                               self.parameters['ERATE'].list_content.append({'storageUnits': unit_name, 'ERATE': unit.e_rate})
+                              self.parameters['STORAGE_LOSSES'].list_content.append({'storageUnits': unit_name, 'STORAGE_LOSSES': unit.daily_storage_loss_perc/100/24})  # Original value is provided in percentage per day, converted to energy per hour
                         else:
                               for layer in unit.layers:
                                     self.parameters['POWER_MAX'].list_content.append({'nonStorageUtilities': unit_name, 'layersOfUnit': layer, 'POWER_MAX': unit.max_installed_power[layer]})

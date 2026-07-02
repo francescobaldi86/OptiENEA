@@ -240,6 +240,7 @@ class StorageUnit(Utility):
     e_rate: float
     stored_energy_layer: str
     exchange_energy_layer: str
+    daily_storage_loss_perc: float
     
     def __init__(self, name, info, problem):
         super().__init__(name, info, problem)
@@ -251,6 +252,7 @@ class StorageUnit(Utility):
         self.max_energy = self.info['Max energy']
         self.c_rate = self.info['C-rate']
         self.e_rate = self.info['E-rate']
+        self.daily_storage_loss_perc = self.info['Daily storage losses']
 
     @staticmethod
     def create_auxiliary_unit_info(storage_unit_name, storage_unit_info, aux_type: str) -> dict:

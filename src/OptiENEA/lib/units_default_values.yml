@@ -23,6 +23,7 @@ StorageUnit:
   E-rate: 100.0
   Charging unit info:
   Discharging unit info:
+  Daily storage loss: 0.0
  
 ChargingUnit:
   Efficiency: 1.0

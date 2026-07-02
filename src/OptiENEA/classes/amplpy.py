@@ -217,7 +217,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. storage_balance{u in storageUnits, l in layersOfUnit[u], t in timeSteps}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,t] = (if t == 0")
             temp_constraints.append("\t\tthen")
-            temp_constraints.append("\t\t\tenergyStorageLevel0[u,l] - power[u,l,t]*TIME_STEP_DURATION")
+            temp_constraints.append("\t\t\tenergyStorageLevel0[u,l] - power[u,l,t]*TIME_STEP_DURATION - energyStorageLevel0[u,l] * STORAGE_LOSSES[u]")
             temp_constraints.append("\t\telse")
             temp_constraints.append("\t\t\tenergyStorageLevel[u,l,t-1] - power[u,l,t]*TIME_STEP_DURATION")
             temp_constraints.append("\t);")
