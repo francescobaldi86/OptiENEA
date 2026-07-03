@@ -252,7 +252,7 @@ class StorageUnit(Utility):
         self.max_energy = self.info['Max energy']
         self.c_rate = self.info['C-rate']
         self.e_rate = self.info['E-rate']
-        self.daily_storage_loss_perc = self.info['Daily storage losses']
+        self.daily_storage_loss_perc = self.info['Daily storage loss']
 
     @staticmethod
     def create_auxiliary_unit_info(storage_unit_name, storage_unit_info, aux_type: str) -> dict:
@@ -348,7 +348,7 @@ class Market(Utility):
                 pass
             case 'SellingMarket':
                 for layer_name, max_power in self.max_installed_power.items():
-                    self.max_installed_power[layer_name] = -max_power
+                    self.max_installed_power[layer_name] = -max_power 
         self.read_prices()
 
     def read_prices(self):

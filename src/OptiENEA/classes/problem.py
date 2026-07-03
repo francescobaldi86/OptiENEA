@@ -148,10 +148,18 @@ class Problem:
             # Addiing ampl parameters
             self.interest_rate = self.raw_general_data['Standard parameters']['Interest rate']
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
-
-            self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
-            self.parameters["TAX_DEDUCTION"].content = self.raw_general_data['Standard parameters']['Tax deduction'] if 'Tax deduction' in self.raw_general_data['Standard parameters'].keys() else 0.0
-            self.parameters["YEARS_FOR_TAX_DEDUCTION"].content = self.raw_general_data['Standard parameters']['Years for tax deduction'] if 'Years for tax deduction' in self.raw_general_data['Standard parameters'].keys() else 1.0
+            # Reading time step duration
+            if isinstance(self.raw_general_data['Standard parameters']['Time step duration'], float | int):
+                  self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
+            elif self.raw_general_data['Standard parameters']['Time step duration'] == 'file':
+                  self.parameters["TIME_STEP_DURATION"] = Parameter("TIME_STEP_DURATION", ['timeSteps'])
+                  self.parameters["TIME_STEP_DURATION"].content = self.raw_timeseries_data[('Time step duration',"-","-")]
+            else:
+                 raise ValueError(f'The value of the Time step duration setting should either be a number or the string "file". {self.raw_general_data["Standard parameters"]["Time step duration"]} was provided')
+            if 'Tax deduction' in self.raw_general_data['Standard parameters'].keys():
+                  self.parameters["TAX_DEDUCTION"].content = self.raw_general_data['Standard parameters']['Tax deduction']
+            if 'Years for tax deduction' in self.raw_general_data['Standard parameters'].keys():
+                  self.parameters["YEARS_FOR_TAX_DEDUCTION"].content = self.raw_general_data['Standard parameters']['Years for tax deduction']
             # self.output_variables = [x.strip() for x in self.raw_general_data['Settings']['Output variables'].split(',')]
             self.output_variables = Variable.load_variables_indexing_data(self.raw_general_data['Settings']['Output variables'])
             # Checking if problem has typical periods
@@ -251,7 +259,10 @@ class Problem:
       def parse_sets(self):
             # NOTE: The append method is a method of the class "Set"
             if not self.has_typical_periods:
-                  self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()))])
+                  if len(self.parameters["TIME_STEP_DURATION"].content) == 1:
+                        self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()))])
+                  else:
+                        self.sets['timeSteps'].content.update([int(x) for x in range(0, len(self.parameters['TIME_STEP_DURATION'].content))])
             else:
                   self.sets['typicalPeriods'].content.update([int(x) for x in range(self.typical_periods.K)])
                   for tp in range(self.typical_periods.K):
@@ -336,7 +347,7 @@ class Problem:
                                           self.parameters['POWER_MAX_REL'].list_content.append(temp)
                               if isinstance(unit, Market):
                                     self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
-                                    if unit.energy_price_variation[layer]:
+                                    if unit.energy_price_variation[layer] is not None:
                                           temp = pd.DataFrame(index = unit.energy_price_variation[layer].index)
                                           temp.loc[:, 'markets'] = unit_name
                                           temp.loc[:, 'layersOfUnit'] = layer

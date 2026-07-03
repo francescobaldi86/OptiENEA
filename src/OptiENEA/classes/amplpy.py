@@ -24,7 +24,9 @@ class AmplProblem(amplpy.AMPL):
         self.has_units_with_minimum_size_if_installed = False
         self.has_units_operated_only_on_off = False
         self.has_typical_periods = False
+        self.has_variable_time_step_durations = False
         self.units_with_time_dependent_maximum_power = []
+        self.has_units_eligible_for_tax_deduction = False
         self.layers_with_time_dependent_price = []
         self.problem = problem
         self.mod_string = f'/* MOD FILE */\n\n/* Problem name: {problem.name} */\n\n'
@@ -75,6 +77,9 @@ class AmplProblem(amplpy.AMPL):
         # Check if problem has typical periods
         if self.problem.has_typical_periods:
             self.has_typical_periods = True
+        # Check if problem has variable time step durations
+        if len(self.problem.parameters['TIME_STEP_DURATION'].content) > 1:
+            self.has_variable_time_step_durations = True
 
     def write_mod_file(self):
         self.write_sets()
@@ -124,7 +129,10 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("/* PROBLEM PARAMETERS */\n")
         temp_params.append("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
         temp_params.append("param POWER{p in processes, l in layersOfUnit[p], t in timeSteps};")
-        temp_params.append("param TIME_STEP_DURATION;")
+        if self.has_variable_time_step_durations:
+            temp_params.append("param TIME_STEP_DURATION{t in timeSteps};")
+        else:
+            temp_params.append("param TIME_STEP_DURATION;")
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST{u in utilities} default 0;")
@@ -139,6 +147,7 @@ class AmplProblem(amplpy.AMPL):
             temp_params.append("param CRATE{u in storageUnits} default 1;")
             temp_params.append("param ERATE{u in storageUnits} default 1;")
             temp_params.append("param ERROR_MARGIN_ON_CYCLIC_SOC default 0.1;")
+            temp_params.append("param STORAGE_LOSSES{u in storageUnits} default 0;")
             idx = temp_params.index("param POWER_MAX{u in utilities, l in layersOfUnit[u]} default 0;")
             temp_params[idx] = "param POWER_MAX{u in nonStorageUtilities, l in layersOfUnit[u]} default 0;"
             idy = temp_params.index("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
@@ -241,7 +250,12 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("\tpower[ch,l,t] >= 0;")
             temp_constraints.append("s.t. discharging_power_only_negative{u in storageUnits, l in layersOfUnit[u], dis in dischargingUtilitiesOfStorageUnit[u], t in timeSteps}:")
             temp_constraints.append("\tpower[dis,l,t] <= 0;")
-        self.mod_string += "\n".join(temp_constraints) + "\n\n\n"
+        temp_mod_string = "\n".join(temp_constraints)
+        # We modify all at once if the TIME_STEP_DURATION parameter has variable length
+        if self.has_variable_time_step_durations:
+            temp_mod_string = temp_mod_string.replace('TIME_STEP_DURATION', 'TIME_STEP_DURATION[t]')
+        self.mod_string += temp_mod_string + "\n\n\n"
+    
         
 
     def write_additional_constraints(self):
@@ -251,7 +265,11 @@ class AmplProblem(amplpy.AMPL):
             additional_constraints.append(f"s.t. {constraint['name']}")
             additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
             additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) <= {constraint['parameter name']};")
-        self.mod_string += "\n".join(additional_constraints) + "\n\n\n"
+        temp_mod_string = "\n".join(additional_constraints)
+        # We modify all at once if the TIME_STEP_DURATION parameter has variable length
+        if self.has_variable_time_step_durations:
+            temp_mod_string = temp_mod_string.replace('TIME_STEP_DURATION', 'TIME_STEP_DURATION[t]')
+        self.mod_string += temp_mod_string + "\n\n\n"
 
     def typical_periods_transformation(self):
         self.mod_string = self.mod_string.replace("set timeSteps;", "set typicalPeriods;\nset timeStepsOfPeriod{tp in typicalPeriods};")
