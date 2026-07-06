@@ -78,7 +78,7 @@ class AmplProblem(amplpy.AMPL):
         if self.problem.has_typical_periods:
             self.has_typical_periods = True
         # Check if problem has variable time step durations
-        if len(self.problem.parameters['TIME_STEP_DURATION'].content) > 1:
+        if isinstance(self.problem.parameters['TIME_STEP_DURATION'].content, pd.Series):
             self.has_variable_time_step_durations = True
 
     def write_mod_file(self):
