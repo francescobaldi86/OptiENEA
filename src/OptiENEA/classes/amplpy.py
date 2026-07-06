@@ -261,10 +261,14 @@ class AmplProblem(amplpy.AMPL):
     def write_additional_constraints(self):
         additional_constraints = []
         for constraint_type, constraint in self.problem.additional_constraints_data.items():
-            additional_constraints.append(f"param {constraint['parameter name']};")
-            additional_constraints.append(f"s.t. {constraint['name']}")
-            additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
-            additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) <= {constraint['parameter name']};")
+            if constraint_type == "MaximumYearlyFlowConstraint":
+                additional_constraints.append(f"param {constraint['parameter name']};")
+                additional_constraints.append(f"var {constraint['variable name']};")
+                additional_constraints.append(f"s.t. {constraint['name']}_calculation")
+                additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
+                additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) = {constraint['variable name']};")
+                additional_constraints.append(f"s.t. {constraint['name']}_calculation")
+                additional_constraints.append(f"{constraint['variable name']} <= {constraint['parameter name']};")
         temp_mod_string = "\n".join(additional_constraints)
         # We modify all at once if the TIME_STEP_DURATION parameter has variable length
         if self.has_variable_time_step_durations:

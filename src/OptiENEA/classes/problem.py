@@ -388,6 +388,7 @@ class Problem:
                         self.parameters[name].content = self.parameters[name].content.set_index(list(self.parameters[name].content.columns[:-1]))     
                   if len(indexing) == 1:
                         indexing = indexing[0]
+                  self.parameters[name].content.sort_index(inplace=True)
                   self.parameters[name].content.loc[indexing, name] = value
 
       
