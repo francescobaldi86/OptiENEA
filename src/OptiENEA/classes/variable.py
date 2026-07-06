@@ -15,5 +15,8 @@ class Variable():
     def load_variables_indexing_data(variables):
         output = {}
         for var_name in variables:
-            output[var_name] = Variable(var_name, DEFAULT_DATA[var_name])
+            if var_name in DEFAULT_DATA.keys():
+                output[var_name] = Variable(var_name, DEFAULT_DATA[var_name])
+            else:
+                output[var_name] = Variable(var_name, [])
         return output

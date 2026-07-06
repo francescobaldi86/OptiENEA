@@ -267,8 +267,7 @@ class AmplProblem(amplpy.AMPL):
                 additional_constraints.append(f"s.t. {constraint['name']}_calculation")
                 additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
                 additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) = {constraint['variable name']};")
-                additional_constraints.append(f"s.t. {constraint['name']}_calculation")
-                additional_constraints.append(f"{constraint['variable name']} <= {constraint['parameter name']};")
+                additional_constraints.append(f"s.t. {constraint['name']}_leq: {constraint['variable name']} <= {constraint['parameter name']};")
         temp_mod_string = "\n".join(additional_constraints)
         # We modify all at once if the TIME_STEP_DURATION parameter has variable length
         if self.has_variable_time_step_durations:
