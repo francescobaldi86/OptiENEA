@@ -18,5 +18,5 @@ class Variable():
             if var_name in DEFAULT_DATA.keys():
                 output[var_name] = Variable(var_name, DEFAULT_DATA[var_name])
             else:
-                output[var_name] = Variable(var_name, [])
+                output[var_name] = Variable(var_name, None)
         return output
