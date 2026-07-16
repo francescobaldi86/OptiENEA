@@ -393,6 +393,14 @@ class Problem:
 
       
       def create_ampl_model(self, run_name: str | None = None):
+            """
+            Create the AMPL model and data files for the current problem instance.
+
+            Parameters
+            ----------
+            run_name : str | None, optional
+                Optional name used to create a dedicated temporary folder for this run.
+            """
             # Based on the available information, create the mod file
             self.ampl_problem = AmplProblem(self)
             self.run_name = run_name if run_name else f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
