@@ -150,7 +150,7 @@ class Problem:
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
             # Reading time step duration
             if isinstance(self.raw_general_data['Standard parameters']['Time step duration'], float | int):
-                  self.parameters["TIME_STEP_DURATION"].content = self.raw_general_data['Standard parameters']['Time step duration']
+                  self.parameters["TIME_STEP_DURATION"].content = [self.raw_general_data['Standard parameters']['Time step duration']]
             elif self.raw_general_data['Standard parameters']['Time step duration'] == 'file':
                   self.parameters["TIME_STEP_DURATION"] = Parameter("TIME_STEP_DURATION", ['timeSteps'])
                   self.parameters["TIME_STEP_DURATION"].content = self.raw_timeseries_data[('Time step duration',"-","-")]
@@ -260,7 +260,7 @@ class Problem:
             # NOTE: The append method is a method of the class "Set"
             if not self.has_typical_periods:
                   if len(self.parameters["TIME_STEP_DURATION"].content) == 1:
-                        self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()))])
+                        self.sets['timeSteps'].content.update([int(x) for x in range(0, int(self.simulation_horizon), int(self.parameters['TIME_STEP_DURATION']()[0]))])
                   else:
                         self.sets['timeSteps'].content.update([int(x) for x in range(0, len(self.parameters['TIME_STEP_DURATION'].content))])
             else:
