@@ -403,7 +403,7 @@ class Problem:
             """
             # Based on the available information, create the mod file
             self.ampl_problem = AmplProblem(self)
-            self.run_name = run_name if run_name else f'Run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
+            self.run_name = run_name if run_name else f'{self.name} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
             self.ampl_problem.temp_folder = os.path.join(self.temp_folder, self.run_name)
             os.mkdir(self.ampl_problem.temp_folder)
             self.ampl_problem.parse_problem_settings()
