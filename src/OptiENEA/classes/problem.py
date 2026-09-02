@@ -373,6 +373,11 @@ class Problem:
                               parameter.content = pd.DataFrame(parameter.list_content)
                         parameter.content = parameter.content.assign(**{param_name: parameter.content[param_name].astype(float)})  # Sets all parameter values to float, so to avoid data type issuse when re-setting the parameter value
                         parameter.content = parameter.content.set_index([x for x in parameter.content.columns if x != param_name])
+                        parameter.content.sort_index(inplace=True)  # Sort the MultiIndex before slicing
+                        # Set parameter content length to be consistent with the horizon
+                        if 'timeSteps' in parameter.content.index.names:
+                              idx = pd.IndexSlice
+                              parameter.content = parameter.content.loc[idx[:, :, :self.simulation_horizon-1], :]
 
       def update_problem_parameters(self, name, indexing, value):
             """
