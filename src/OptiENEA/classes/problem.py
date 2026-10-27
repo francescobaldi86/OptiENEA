@@ -42,9 +42,12 @@ class Problem:
       interest_rate: float
       simulation_horizon: int
       ampl_parameters : dict
+      units_filename: str
+      general_filename: str
+      timeseriesdata_filename: str
 
       # Initialization function
-      def __init__(self, name: str, problem_folder = None, temp_folder = None, input_folder = None, results_folder = None):
+      def __init__(self, name: str, problem_folder = None, temp_folder = None, input_folder = None, results_folder = None, units_filename: str = None, general_filename: str = None, timeseriesdata_filename: str = None):
             """
             :param: problem_folder        the folder where the main content of the problem is (data, results, etc)
             :param: temp_folder           the temporary folder where temporary data is saved. Useful to specify if problem_folder is on cloud and many simulations are expected
@@ -68,6 +71,9 @@ class Problem:
             self.raw_unit_data = {}
             self.additional_constraints_data = {}
             self.has_typical_periods = False
+            self.units_filename = units_filename if units_filename is not None else 'units.yml'
+            self.general_filename = general_filename if general_filename is not None else 'general.yml'
+            self.timeseriesdata_filename = timeseriesdata_filename if timeseriesdata_filename is not None else 'timeseries_data.csv'
 
       def load_problem_data():
             """
@@ -114,16 +120,16 @@ class Problem:
                   - 'units.yml' for data related to problem units
                   - 'general.yml' for general data about the problem
             """
-            with open(os.path.join(self.input_folder, 'units.yml'), 'r') as stream:
+            with open(os.path.join(self.input_folder, self.units_filename), 'r') as stream:
                   self.raw_unit_data = yaml.safe_load(stream)
-            with open(os.path.join(self.input_folder, 'general.yml'), 'r') as stream:
+            with open(os.path.join(self.input_folder, self.general_filename), 'r') as stream:
                   self.raw_general_data = yaml.safe_load(stream)
             if 'constraints.yml' in os.listdir(self.input_folder):
                   with open(os.path.join(self.input_folder, 'constraints.yml'), 'r') as stream:
                         self.additional_constraints_data = yaml.safe_load(stream)
             if 'timeseries_data.csv' in os.listdir(self.input_folder):
                   self.raw_timeseries_data = pd.read_csv(
-                        os.path.join(self.input_folder, 'timeseries_data.csv'), 
+                        os.path.join(self.input_folder, self.timeseriesdata_filename), 
                         header = [0,1,2], 
                         index_col = 0, 
                         sep = ";")
