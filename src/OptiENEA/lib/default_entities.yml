@@ -80,6 +80,7 @@ VARIABLES:
     - outputMarketLayers
   layer_emissions:
     - outputMarketLayers
+    - timeSteps
   power: 
     - units
     - layersOfUnit
