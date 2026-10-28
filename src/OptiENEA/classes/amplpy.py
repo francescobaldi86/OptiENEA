@@ -141,8 +141,10 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST{u in utilities} default 0;")
         temp_params.append("param AVERAGE_ENERGY_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
+        temp_params.append("param AVERAGE_EMISSION_FACTOR{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
         temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
+        temp_params.append("param EMISSION_FACTOR_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
         temp_params.append("param BIG_M default 100;")
         if self.has_minimum_installed_power:
             temp_params.append("param POWER_MIN{u in nonmarketUtilities} default 0;")

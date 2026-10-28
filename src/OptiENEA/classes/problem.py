@@ -374,7 +374,7 @@ class Problem:
                                           else:
                                                 temp.loc[:, 'typicalDays'] = typical_periods
                                                 temp.loc[:, 'timeStepsOfPeriod'] = time_steps
-                                          temp.loc[:, 'EMISSION_FACTOR_VARIATION'] = unit.energy_price_variation[layer]
+                                          temp.loc[:, 'EMISSION_FACTOR_VARIATION'] = unit.emission_factor_variation[layer]
                                           self.parameters['EMISSION_FACTOR_VARIATION'].list_content.append(temp)
                   else:
                         raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
