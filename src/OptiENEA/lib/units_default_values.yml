@@ -36,5 +36,5 @@ DischargingUnit:
   Energy requirement layer:
 
 Market:
-  Price: 0.0
-  Emission factor: 0.0
+  Price: [0.0]
+  Emission factor: [0.0]
