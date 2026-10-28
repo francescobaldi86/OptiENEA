@@ -78,9 +78,8 @@ VARIABLES:
     - nonmarketUtilities
   layer_operating_cost:
     - outputMarketLayers
-  layer_emissions:
+  layer_ghg_emissions:
     - outputMarketLayers
-    - timeSteps
   power: 
     - units
     - layersOfUnit
