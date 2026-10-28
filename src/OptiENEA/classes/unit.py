@@ -128,11 +128,12 @@ class Unit:
                     if round(average_value, 1) == 1.0 or round(maximum_value,1) == 1.0:
                         variable_reference_value[layer] = self.info[input_name][id]
                         variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']
-                        print(f'WARNING! For market unit {self.name} you provided both a fixed price and a time-dependent "{input_name}". The latter has average 1, so it will be considered as adimensional')
+                        print(f'WARNING! Unit {self.name} you provided both a fixed price and a time-dependent "{input_name}". The latter has average 1, so it will be considered as adimensional')
                     else:
                         variable_reference_value[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].mean()
-                        variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']/variable_reference_value[layer]    
-                        print(f'WARNING!! Market unit {self.name} was provided both with a fixed and a time-dependent price "{input_name}". The fixed value will be ignored')
+                        variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']/variable_reference_value[layer]
+                        if self.info[input_name][id] != 0.0:
+                            print(f'WARNING!! Unit {self.name} was provided both with a fixed and a time-dependent price "{input_name}". The fixed value will be ignored')
                 elif self.info[input_name][id] == 'file':
                     variable_reference_value[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].mean()
                     variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']/variable_reference_value[layer]
@@ -390,7 +391,8 @@ class Market(Utility):
                 pass
             case 'SellingMarket':
                 for layer_name, max_power in self.max_installed_power.items():
-                    self.max_installed_power[layer_name] = -max_power 
+                    self.max_installed_power[layer_name] = -max_power
+        self.check_default_values('Market')
         self.read_variable_input(input_name='Price', attribute_name='energy_price')
         self.read_variable_input(input_name='Emission factor', attribute_name='emission_factor')
 
