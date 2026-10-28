@@ -198,7 +198,8 @@ class Utility(Unit):
     specific_capex: float | int | list
     lifetime: int | list
     specific_annualized_capex: float
-    specific_opex: float
+    specific_opex_fix: float
+    specific_opex_var: float
     max_installed_power: dict
     time_dependent_capacity_factor: pd.Series | None
     has_time_dependent_power: bool
@@ -211,7 +212,8 @@ class Utility(Unit):
         self.has_time_dependent_power = False
         self.check_default_values('Utility')
         self.specific_capex = self.info['Specific CAPEX']
-        self.specific_opex = self.info['Specific OPEX']
+        self.specific_opex_fix = self.info['Specific fix OPEX']
+        self.specific_opex_var = self.info['Specific variable OPEX']
         self.lifetime = self.info['Lifetime']
         self.minimum_installed_power = self.info['Min installed power']
         self.minimum_size_if_installed = self.info['Min size if installed']

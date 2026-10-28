@@ -140,6 +140,8 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST{u in utilities} default 0;")
+        temp_params.append("param SPECIFIC_OPEX_FIX{u in utilities} default 0;")
+        temp_params.append("param SPECIFIC_OPEX_VAR{u in utilities} default 0;")
         temp_params.append("param AVERAGE_ENERGY_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param AVERAGE_EMISSION_FACTOR{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
@@ -174,6 +176,9 @@ class AmplProblem(amplpy.AMPL):
         temp_vars.append("var layer_ghg_emissions{(u,l) in outputMarketLayers};")
         temp_vars.append("var ics{u in nonmarketUtilities, t in timeSteps} >= 0, <= 1;")
         temp_vars.append("var OPEX;")
+        temp_vars.append("var OPEX_fuel;")
+        temp_vars.append("var OPEX_fix;")
+        temp_vars.append("var OPEX_var;")
         temp_vars.append("var GHG_emissions;")
         if self.has_storage:
             temp_vars.append("var energyStorageLevel{u in storageUnits, l in layersOfUnit[u], t in timeSteps} >=0;")
@@ -202,9 +207,12 @@ class AmplProblem(amplpy.AMPL):
         temp_constraints = []
         temp_constraints.append("/* CONSTRAINTS */\n")
         if self.has_units_eligible_for_tax_deduction:
-            temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l] - sum{u in unitsEligibleForTaxDeduction} size[u] * SPECIFIC_INVESTMENT_COST[u] * TAX_DEDUCTION / YEARS_FOR_TAX_DEDUCTION;")
+            temp_constraints.append("s.t. calculate_opex: OPEX = OPEX_fuel + OPEX_fix + OPEX_var - sum{u in unitsEligibleForTaxDeduction} size[u] * SPECIFIC_INVESTMENT_COST[u] * TAX_DEDUCTION / YEARS_FOR_TAX_DEDUCTION;")
         else:
-            temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
+            temp_constraints.append("s.t. calculate_opex: OPEX = OPEX_fuel + OPEX_fix + OPEX_var;")
+        temp_constraints.append("s.t. calculate_OPEX_fuel: OPEX_fuel = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
+        temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = sum{u in nonmarketUtilities} size[u] * SPECIFIC_OPEX_FIX[u];")
+        temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in nonmarketUtilities, t in timeSteps} ics[u,t] * size[u] * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
         temp_constraints.append("s.t. calculate_ghg_emissions: GHG_emissions = sum{(u,l) in outputMarketLayers} layer_ghg_emissions[u,l];")
         temp_constraints.append("s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;")
         temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = -POWER[p,l,t];")

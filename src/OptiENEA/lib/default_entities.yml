@@ -30,6 +30,10 @@ PARAMETERS:
     - utilities
   SPECIFIC_INVESTMENT_COST_ANNUALIZED: 
     - utilities
+  SPECIFIC_OPEX_FIX:
+    - utilities
+  SPECIFIC_OPEX_VAR:
+    - utilities
   POWER_MIN:
     - utilities
   SIZE_MIN_IF_INSTALLED:
