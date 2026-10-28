@@ -20,6 +20,7 @@ class AmplProblem(amplpy.AMPL):
         self.has_time_dependent_power = False
         self.has_time_dependent_max_power = False
         self.has_time_dependent_energy_prices = False
+        self.has_time_dependent_emission_factors = False
         self.has_minimum_installed_power = False
         self.has_units_with_minimum_size_if_installed = False
         self.has_units_operated_only_on_off = False
@@ -65,6 +66,9 @@ class AmplProblem(amplpy.AMPL):
         # Check if problem has time-dependent energy prices
         if not self.problem.parameters['ENERGY_PRICE_VARIATION'].content.empty:
             self.has_time_dependent_energy_prices = True
+        # Check if problem has time-dependent energy prices
+        if not self.problem.parameters['EMISSION_FACTOR_VARIATION'].content.empty:
+            self.has_time_dependent_emission_factors = True
         # Check if problem has units that can only be installed with a minmium size:
         if len(self.problem.sets['unitsWithMinimumSizeIfInstalled'].content) > 0:
             self.has_units_with_minimum_size_if_installed = True
@@ -136,7 +140,7 @@ class AmplProblem(amplpy.AMPL):
         temp_params.append("param OCCURRANCE;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST_ANNUALIZED{u in utilities} default 0;")
         temp_params.append("param SPECIFIC_INVESTMENT_COST{u in utilities} default 0;")
-        temp_params.append("param ENERGY_AVERAGE_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
+        temp_params.append("param AVERAGE_ENERGY_PRICE{m in markets, l in layersOfUnit[m]} default 0;")
         temp_params.append("param POWER_MAX_REL{u in utilities, l in layersOfUnit[u], t in timeSteps} default 1;")
         temp_params.append("param ENERGY_PRICE_VARIATION{m in markets, l in layersOfUnit[m], t in timeSteps} default 1;")
         temp_params.append("param BIG_M default 100;")
@@ -164,9 +168,11 @@ class AmplProblem(amplpy.AMPL):
         temp_vars = []
         temp_vars.append("/* PROBLEM VARIABLES */\n")
         temp_vars.append("var power{u in units, l in layersOfUnit[u], t in timeSteps};")
-        temp_vars.append("var layer_operating_cost{(u,l) in outputMarketLayers};")
+        temp_vars.append("var layer_operating_cost{(u,l) in outputMarketLayers};")  
+        temp_vars.append("var layer_ghg_emissions{(u,l) in outputMarketLayers};")
         temp_vars.append("var ics{u in nonmarketUtilities, t in timeSteps} >= 0, <= 1;")
         temp_vars.append("var OPEX;")
+        temp_vars.append("var GHG_emissions;")
         if self.has_storage:
             temp_vars.append("var energyStorageLevel{u in storageUnits, l in layersOfUnit[u], t in timeSteps} >=0;")
             temp_vars.append("var energyStorageLevel0{u in storageUnits, l in layersOfUnit[u]} >=0;")
@@ -197,6 +203,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l] - sum{u in unitsEligibleForTaxDeduction} size[u] * SPECIFIC_INVESTMENT_COST[u] * TAX_DEDUCTION / YEARS_FOR_TAX_DEDUCTION;")
         else:
             temp_constraints.append("s.t. calculate_opex: OPEX = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
+        temp_constraints.append("s.t. calculate_ghg_emissions: GHG_emissions = sum{(u,l) in outputMarketLayers} layer_ghg_emissions[u,l];")
         temp_constraints.append("s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;")
         temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = -POWER[p,l,t];")
         # Constraints to be added depending on whether we are calculating the cost of the investment or not
@@ -209,7 +216,9 @@ class AmplProblem(amplpy.AMPL):
         if self.has_minimum_installed_power:
             temp_constraints.append("s.t. minimum_installed_power{u in nonmarketUtilities}: size[u] >= POWER_MIN[u];")
         # Constraints to be added depending on whether energy prices depend on the time step or not
-        temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * ENERGY_AVERAGE_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")        
+        temp_constraints.append("s.t. calculate_operating_cost_time_dependent{u in markets, l in layersOfUnit[u]}: layer_operating_cost[u,l] = sum{t in timeSteps} (power[u,l,t] * AVERAGE_ENERGY_PRICE[u,l] * ENERGY_PRICE_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")
+        # Calculate carbon emissions
+        temp_constraints.append("s.t. calculate_ghg_emissions_time_dependent{u in markets, l in layersOfUnit[u]}: layer_ghg_emissions[u,l] = sum{t in timeSteps} (power[u,l,t] * AVERAGE_EMISSION_FACTOR[u,l] * EMISSION_FACTOR_VARIATION[u,l,t]) * TIME_STEP_DURATION * OCCURRANCE;")
         # Constraints to be added depending on whether the maximum power output of the utilities depends on the time step or not
         temp_constraints.append("s.t. component_load{u in standardUtilities, l in layersOfUnit[u], t in timeSteps}: power[u,l,t] = ics[u,t] * POWER_MAX[u,l] * POWER_MAX_REL[u,l,t];")
         # temp_constraints.append("s.t. market_limits{u in markets, l in layersOfUnit[u], t in timeSteps}: POWER_MAX[u,l] * POWER_MAX_REL[u,l,t] <= power[u,l,t] <= 0;")

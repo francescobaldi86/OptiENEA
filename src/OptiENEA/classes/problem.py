@@ -352,7 +352,8 @@ class Problem:
                                           temp.loc[:, 'POWER_MAX_REL'] = unit.time_dependent_capacity_factor[layer]
                                           self.parameters['POWER_MAX_REL'].list_content.append(temp)
                               if isinstance(unit, Market):
-                                    self.parameters['ENERGY_AVERAGE_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'ENERGY_AVERAGE_PRICE': unit.energy_price[layer]})
+                                    self.parameters['AVERAGE_ENERGY_PRICE'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'AVERAGE_ENERGY_PRICE': unit.energy_price[layer]})
+                                    self.parameters['AVERAGE_EMISSION_FACTOR'].list_content.append({'markets': unit_name, 'layersOfUnit': layer, 'AVERAGE_EMISSION_FACTOR': unit.emission_factor[layer]})
                                     if unit.energy_price_variation[layer] is not None:
                                           temp = pd.DataFrame(index = unit.energy_price_variation[layer].index)
                                           temp.loc[:, 'markets'] = unit_name
@@ -364,6 +365,17 @@ class Problem:
                                                 temp.loc[:, 'timeStepsOfPeriod'] = time_steps
                                           temp.loc[:, 'ENERGY_PRICE_VARIATION'] = unit.energy_price_variation[layer]
                                           self.parameters['ENERGY_PRICE_VARIATION'].list_content.append(temp)
+                                    if unit.emission_factor_variation[layer] is not None:
+                                          temp = pd.DataFrame(index = unit.emission_factor_variation[layer].index)
+                                          temp.loc[:, 'markets'] = unit_name
+                                          temp.loc[:, 'layersOfUnit'] = layer
+                                          if not self.has_typical_periods:
+                                                temp.loc[:, 'timeSteps'] = time_steps
+                                          else:
+                                                temp.loc[:, 'typicalDays'] = typical_periods
+                                                temp.loc[:, 'timeStepsOfPeriod'] = time_steps
+                                          temp.loc[:, 'EMISSION_FACTOR_VARIATION'] = unit.energy_price_variation[layer]
+                                          self.parameters['EMISSION_FACTOR_VARIATION'].list_content.append(temp)
                   else:
                         raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
             # Adding parameters defined in additional constraints      
@@ -373,7 +385,7 @@ class Problem:
             # Finally doing the conversion from lists to Dataframes
             for param_name, parameter in self.parameters.items():
                   if parameter.indexing_level > 0 and parameter.list_content != []:
-                        if param_name in {'ENERGY_PRICE_VARIATION', 'POWER_MAX_REL', 'POWER'}:
+                        if param_name in {'ENERGY_PRICE_VARIATION', 'POWER_MAX_REL', 'POWER', 'EMISSION_FACTOR_VARIATION'}:
                               parameter.content = pd.concat(parameter.list_content)
                         else:
                               parameter.content = pd.DataFrame(parameter.list_content)

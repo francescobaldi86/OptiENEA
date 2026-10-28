@@ -97,6 +97,48 @@ class Unit:
             output = info[attribute_name]
         return output
 
+    def read_variable_input(self, input_name: str, attribute_name: str):
+        setattr(self, attribute_name, {l: 0.0 for l in self.layers})
+        setattr(self, f'{attribute_name}_variation', {l: None for l in self.layers})
+        setattr(self, f'has_time_dependent_{attribute_name}s', {l: False for l in self.layers})
+        variable_reference_value = getattr(self, attribute_name)
+        variable_time_series = getattr(self, f'{attribute_name}_variation')
+        variable_has_time_series = getattr(self, f'has_time_dependent_{attribute_name}s')
+        if self.ts_data is not None:
+            for layer in self.layers:
+                if f'{self.name}:{input_name} variation:{layer}' in self.ts_data.columns or f'{self.name}:{input_name}:{layer}' in self.ts_data.columns:
+                    variable_has_time_series[layer] = True
+        for id, layer in enumerate(self.layers):
+            if variable_has_time_series[layer] == False:
+                variable_reference_value[layer] = self.info[input_name][id]
+            else:
+                if input_name not in self.info.keys():
+                    variable_reference_value[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].mean()
+                    variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']/variable_reference_value[layer]
+                elif isinstance(self.info[input_name][id], float | int) and f'{self.name}:{input_name} variation:{layer}' in self.ts_data.columns: # Case 1: {input_name} value and {input_name} variation
+                    average_value = self.ts_data.loc[:, f'{self.name}:{input_name} variation:{layer}'].mean()
+                    maximum_value = self.ts_data.loc[:, f'{self.name}:{input_name} variation:{layer}'].max()
+                    variable_reference_value[layer] = self.info[input_name][id]
+                    variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name} variation:{layer}']
+                    if round(average_value, 1) != 1.0 or round(maximum_value,1) != 1.0:
+                        print(f'WARNING!! Time series and price values for market {self.name} are not consistent. The time series for price variation will be multiplied by the reference {input_name}, so it should be either a value with mean = 1 or with max = 1')
+                elif isinstance(self.info[input_name][id], float | int) and f'{self.name}:{input_name}:{layer}' in self.ts_data.columns:  # Case 2: {input_name} value and "{input_name}" column
+                    average_value = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].mean()
+                    maximum_value = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].max()
+                    if round(average_value, 1) == 1.0 or round(maximum_value,1) == 1.0:
+                        variable_reference_value[layer] = self.info[input_name][id]
+                        variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']
+                        print(f'WARNING! For market unit {self.name} you provided both a fixed price and a time-dependent "{input_name}". The latter has average 1, so it will be considered as adimensional')
+                    else:
+                        variable_reference_value[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].mean()
+                        variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']/variable_reference_value[layer]    
+                        print(f'WARNING!! Market unit {self.name} was provided both with a fixed and a time-dependent price "{input_name}". The fixed value will be ignored')
+                elif self.info[input_name][id] == 'file':
+                    variable_reference_value[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}'].mean()
+                    variable_time_series[layer] = self.ts_data.loc[:, f'{self.name}:{input_name}:{layer}']/variable_reference_value[layer]
+                else:
+                    raise ValueError(f'The "{input_name}" should be a list of float or include the "file" value. {self.info[input_name]} was provided for unit {self.name}')
+
 
 
 class Process(Unit):
@@ -349,46 +391,8 @@ class Market(Utility):
             case 'SellingMarket':
                 for layer_name, max_power in self.max_installed_power.items():
                     self.max_installed_power[layer_name] = -max_power 
-        self.read_prices()
-
-    def read_prices(self):
-        self.energy_price = {l: 0.0 for l in self.layers}
-        self.energy_price_variation = {l: None for l in self.layers}
-        self.has_time_dependent_energy_prices = {l: False for l in self.layers}
-        if self.ts_data is not None:
-            for layer in self.layers:
-                if f'{self.name}:Price variation:{layer}' in self.ts_data.columns or f'{self.name}:Price:{layer}' in self.ts_data.columns:
-                    self.has_time_dependent_energy_prices[layer] = True                    
-        for id, layer in enumerate(self.layers):
-            if self.has_time_dependent_energy_prices[layer] == False:
-                self.energy_price[layer] = self.info['Price'][id]
-            else:
-                if 'Price' not in self.info.keys():
-                    self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
-                    self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]
-                elif isinstance(self.info['Price'][id], float | int) and f'{self.name}:Price variation:{layer}' in self.ts_data.columns: # Case 1: Price value and price variation
-                    average_price = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}'].mean()
-                    maximum_price = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}'].max()
-                    self.energy_price[layer] = self.info['Price'][id]
-                    self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price variation:{layer}']
-                    if round(average_price, 1) != 1.0 or round(maximum_price,1) != 1.0:
-                        print(f'WARNING!! Time series and price values for market {self.name} are not consistent. The time series for price variation will be multiplied by the reference price, so it should be either a value with mean = 1 or with max = 1')
-                elif isinstance(self.info['Price'][id], float | int) and f'{self.name}:Price:{layer}' in self.ts_data.columns:  # Case 2: price value and "Price" column
-                    average_price = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
-                    maximum_price = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].max()
-                    if round(average_price, 1) == 1.0 or round(maximum_price,1) == 1.0:
-                        self.energy_price[layer] = self.info['Price'][id]
-                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']
-                        print(f'WARNING! For market unit {self.name} you provided both a fixed price and a time-dependent "Price". The latter has average 1, so it will be considered as adimensional')
-                    else:
-                        self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
-                        self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]    
-                        print(f'WARNING!! Market unit {self.name} was provided both with a fixed and a time-dependent price "Price". The fixed value will be ignored')
-                elif self.info['Price'][id] == 'file':
-                    self.energy_price[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}'].mean()
-                    self.energy_price_variation[layer] = self.ts_data.loc[:, f'{self.name}:Price:{layer}']/self.energy_price[layer]
-                else:
-                    raise ValueError(f'The "Price" should be a list of float or include the "file" value. {self.info["Price"]} was provided for unit {self.name}')
+        self.read_variable_input(input_name='Price', attribute_name='energy_price')
+        self.read_variable_input(input_name='Emission factor', attribute_name='emission_factor')
 
     def check_data_consistency(self):
         assert len(self.layers) == len(self.activation_frequency)

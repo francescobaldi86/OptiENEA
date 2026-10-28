@@ -45,7 +45,10 @@ PARAMETERS:
   POWER_MAX:
     - nonStorageUtilities
     - layersOfUnit
-  ENERGY_AVERAGE_PRICE:
+  AVERAGE_ENERGY_PRICE:
+    - markets
+    - layersOfUnit
+  AVERAGE_EMISSION_FACTOR:
     - markets
     - layersOfUnit
   POWER:
@@ -53,6 +56,10 @@ PARAMETERS:
     - layersOfUnit
     - timeSteps
   ENERGY_PRICE_VARIATION:
+    - markets
+    - layersOfUnit
+    - timeSteps
+  EMISSION_FACTOR_VARIATION:
     - markets
     - layersOfUnit
     - timeSteps
@@ -64,11 +71,14 @@ VARIABLES:
   CAPEX:
   OPEX:
   TOTEX:
+  EMISSIONS:
   size:
     - nonmarketUtilities
   unitAnnualizedInvestmentCost:
     - nonmarketUtilities
   layer_operating_cost:
+    - outputMarketLayers
+  layer_emissions:
     - outputMarketLayers
   power: 
     - units
