@@ -9,7 +9,8 @@ Process:
 Utility:
   Specific CAPEX: 0.01
   Lifetime: 25
-  Specific OPEX: 0.0
+  Specific variable OPEX: 0.0
+  Specific fixed OPEX: 0.0
   Max installed power:
   Min installed power: 0
   Min size if installed: 0
