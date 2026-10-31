@@ -328,6 +328,8 @@ class Problem:
                   elif isinstance(unit, Utility):
                         self.parameters['SPECIFIC_INVESTMENT_COST_ANNUALIZED'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST_ANNUALIZED': unit.specific_annualized_capex})
                         self.parameters['SPECIFIC_INVESTMENT_COST'].list_content.append({'utilities': unit_name, 'SPECIFIC_INVESTMENT_COST': unit.specific_capex})
+                        self.parameters['SPECIFIC_OPEX_FIX'].list_content.append({'utilities': unit_name, 'SPECIFIC_OPEX_FIX': unit.specific_capex * unit.specific_opex_fix})
+                        self.parameters['SPECIFIC_OPEX_VAR'].list_content.append({'utilities': unit_name, 'SPECIFIC_OPEX_VAR': unit.specific_opex_var})
                         if unit.has_minimum_installed_power:
                               self.parameters['POWER_MIN'].list_content.append({'utilities': unit_name, 'POWER_MIN': unit.minimum_installed_power})
                         if unit.has_minimum_size_if_installed:
