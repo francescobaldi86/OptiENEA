@@ -45,6 +45,8 @@ class Problem:
       units_filename: str
       general_filename: str
       timeseriesdata_filename: str
+      use_opex_fix: bool
+      use_opex_variable: bool
 
       # Initialization function
       def __init__(self, name: str, problem_folder = None, temp_folder = None, input_folder = None, results_folder = None, units_filename: str = None, general_filename: str = None, timeseriesdata_filename: str = None):
@@ -71,6 +73,8 @@ class Problem:
             self.raw_unit_data = {}
             self.additional_constraints_data = {}
             self.has_typical_periods = False
+            self.use_opex_fix = False
+            self.use_opex_variable = False
             self.units_filename = units_filename if units_filename is not None else 'units.yml'
             self.general_filename = general_filename if general_filename is not None else 'general.yml'
             self.timeseriesdata_filename = timeseriesdata_filename if timeseriesdata_filename is not None else 'timeseries_data.csv'
@@ -170,6 +174,10 @@ class Problem:
             self.output_variables = Variable.load_variables_indexing_data(self.raw_general_data['Settings']['Output variables'])
             # Checking if problem has typical periods
             self.has_typical_periods = True if 'Typical periods' in self.raw_general_data['Settings'].keys() else False
+            if 'Use fix OPEX' in self.raw_general_data['Standard parameters']:
+                  self.use_opex_fix = self.raw_general_data['Settings']['Use fix OPEX']
+            if 'Use variable OPEX' in self.raw_general_data['Standard parameters']:
+                  self.use_opex_variable = self.raw_general_data['Settings']['Use variable OPEX']
             self.objective = ObjectiveFunction(self.raw_general_data['Settings']['Objective'])
 
       def generate_typical_periods(self):

@@ -12,11 +12,15 @@ class AmplProblem(amplpy.AMPL):
     layers_with_time_dependent_price: list
     has_minimum_installed_power: bool
     has_units_with_minimum_size_if_installed: bool
+    use_opex_fix: bool
+    use_opex_variable: bool
 
     def __init__(self, problem):
         super().__init__()
         self.has_storage = False
         self.has_capex = False
+        self.use_opex_fix = False
+        self.use_opex_variable = False
         self.has_time_dependent_power = False
         self.has_time_dependent_max_power = False
         self.has_time_dependent_energy_prices = False
@@ -84,6 +88,11 @@ class AmplProblem(amplpy.AMPL):
         # Check if problem has variable time step durations
         if isinstance(self.problem.parameters['TIME_STEP_DURATION'].content, pd.Series):
             self.has_variable_time_step_durations = True
+        # Check whether to use non-fuel related OPEX or not
+        if self.problem.use_opex_fix is True:
+            self.use_opex_fix = True
+        if self.problem.use_opex_variable is True:
+                self.use_opex_variable = True
 
     def write_mod_file(self):
         self.write_sets()
@@ -211,8 +220,14 @@ class AmplProblem(amplpy.AMPL):
         else:
             temp_constraints.append("s.t. calculate_opex: OPEX = OPEX_fuel + OPEX_fix + OPEX_var;")
         temp_constraints.append("s.t. calculate_OPEX_fuel: OPEX_fuel = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
-        temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = sum{u in nonmarketUtilities} size[u] * SPECIFIC_OPEX_FIX[u];")
-        temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in nonmarketUtilities, t in timeSteps} ics[u,t] * size[u] * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
+        if self.use_opex_fix:
+            temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = sum{u in nonmarketUtilities} size[u] * SPECIFIC_OPEX_FIX[u];")
+        else:
+            temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = 0.0;")
+        if self.use_opex_variable:
+            temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in nonmarketUtilities, t in timeSteps} ics[u,t] * size[u] * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
+        else:
+            temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = 0.0;")
         temp_constraints.append("s.t. calculate_ghg_emissions: GHG_emissions = sum{(u,l) in outputMarketLayers} layer_ghg_emissions[u,l];")
         temp_constraints.append("s.t. layer_balance{l in layers, t in timeSteps}: sum{u in unitsOfLayer[l]} (power[u,l,t]) = 0;")
         temp_constraints.append("s.t. process_power{p in processes, l in layersOfUnit[p], t in timeSteps}: power[p,l,t] = -POWER[p,l,t];")
