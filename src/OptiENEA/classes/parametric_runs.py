@@ -69,8 +69,8 @@ class ParametricRuns():
                 name = self.problem.name, 
                 problem_folder = self.problem.problem_folder,
                 temp_folder = os.path.join(self.parametric_runs_temp_folder, f'Scenario {scenario}'),
-                input_folder = problem.input_folder,
-                units_filename = problem.units_filename,
+                input_folder = self.problem.input_folder,
+                units_filename = self.problem.units_filename,
                 results_folder = os.path.join(self.parametric_runs_results_folder)
                 )
             validate_project_structure(problem.problem_folder)
