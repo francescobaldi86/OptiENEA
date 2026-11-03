@@ -13,7 +13,10 @@ class ObjectiveFunction():
                 self.constraints = []
             case "GHG_emissions":
                 self.objective = "minimize obj: GHG_emissions;\n"
-                self.constraints= []
+                self.constraints = []
+            case "CAPEX90":
+                self.objective = "minimize obj: 0.9 * CAPEX + 0.1 * OPEX;\n"
+                self.constraints = []
             case _:
                 self.objective = info['objective']
                 self.constraints = info['constraints']
