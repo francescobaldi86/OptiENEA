@@ -3,8 +3,7 @@ import os
 from collections import defaultdict
 import stat, shutil, time
 REQUIRED_STRUCTURE = {
-    'folders': ['Input', ],
-    'files': ['Input/units.yml', 'Input/general.yml']
+    'folders': ['Input', 'Temporary files', 'Results']
 }
 
 def read_config_file(filename: str, data_structure = {}) -> dict:
@@ -128,21 +127,25 @@ class ProjectStructureError(Exception):
     """Custom exception for project structure errors."""
     pass
 
-def validate_project_structure(project_path, required=REQUIRED_STRUCTURE):
+def validate_project_structure(project_path, units_filename, general_filename):
     missing_items = []
 
     # Check required folders
-    for folder in required.get('folders', []):
+    for folder in REQUIRED_STRUCTURE.get('folders', []):
         folder_path = os.path.join(project_path, folder)
         if not os.path.isdir(folder_path):
-            missing_items.append(f"Missing folder: {folder}")
+            try:
+                os.mkdir(folder_path)
+            except OSError as e:
+                missing_items.append(f"Missing folder: {folder}")
 
     # Check required files
-    for file in required.get('files', []):
-        [folder_name, file_name] = file.split('/')
-        file_path = os.path.join(project_path, folder_name, file_name)
-        if not os.path.isfile(file_path):
-            missing_items.append(f"Missing file: {file}")
+    units_file_path = os.path.join(project_path, 'Input', units_filename)
+    general_file_path = os.path.join(project_path, 'Input', general_filename)
+    if not os.path.isfile(units_file_path):
+        missing_items.append(f"Missing file: {units_filename}")
+    if not os.path.isfile(general_file_path):
+        missing_items.append(f"Missing file: {general_filename}")
 
     if missing_items:
         raise ProjectStructureError(

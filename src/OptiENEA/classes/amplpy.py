@@ -225,7 +225,7 @@ class AmplProblem(amplpy.AMPL):
         else:
             temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = 0.0;")
         if self.use_opex_variable:
-            temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in nonmarketUtilities, t in timeSteps} ics[u,t] * size[u] * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
+            temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in nonmarketUtilities, t in timeSteps} ics[u,t] * abs(POWER_MAX[u,l]) * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
         else:
             temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = 0.0;")
         temp_constraints.append("s.t. calculate_ghg_emissions: GHG_emissions = sum{(u,l) in outputMarketLayers} layer_ghg_emissions[u,l];")
@@ -262,7 +262,7 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("\t\tthen")
             temp_constraints.append("\t\t\tenergyStorageLevel0[u,l] - power[u,l,t]*TIME_STEP_DURATION - energyStorageLevel0[u,l] * STORAGE_LOSSES[u]")
             temp_constraints.append("\t\telse")
-            temp_constraints.append("\t\t\tenergyStorageLevel[u,l,t-1] - power[u,l,t]*TIME_STEP_DURATION")
+            temp_constraints.append("\t\t\tenergyStorageLevel[u,l,t-1] - power[u,l,t]*TIME_STEP_DURATION - energyStorageLevel[u,l,t] * STORAGE_LOSSES[u]")
             temp_constraints.append("\t);")
             temp_constraints.append("s.t. storage_cyclic_constraint_high{u in storageUnits, l in layersOfUnit[u]}:")
             temp_constraints.append("\tenergyStorageLevel[u,l,card(timeSteps)-1] - energyStorageLevel0[u,l] >= 0;")
@@ -336,4 +336,7 @@ class AmplProblem(amplpy.AMPL):
         # Writes the problem data to amplpy
         for parameter_name, parameter in self.problem.parameters.items():
             if not parameter.is_empty(): 
-                self.param[parameter_name] = parameter.content    
+                self.param[parameter_name] = parameter.content
+    
+    def fix_problem_variable(self, variable_name, indexing, value):
+        self.eval(f'fix {variable_name}[{indexing}] := {value};\n')

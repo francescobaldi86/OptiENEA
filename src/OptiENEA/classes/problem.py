@@ -88,7 +88,7 @@ class Problem:
             """
             Class method that simply runs the model as a whole. Useful once everything is set up to run things quickly
             """
-            validate_project_structure(self.problem_folder)
+            validate_project_structure(self.problem_folder, self.units_filename, self.general_filename)
             self.create_folders()  # Creates the project folders
             self.read_problem_data()  # Reads problem general data and data about units
             self.read_problem_parameters()
@@ -424,6 +424,13 @@ class Problem:
                   self.parameters[name].content.sort_index(inplace=True)
                   self.parameters[name].content.loc[indexing, name] = value
 
+      def fix_problem_variable(self, variable_name, indexing, value):
+            """
+            This function is used to provide to the problem info that is used with the "fix" command. 
+            The idea is that the user can provide a dictionary with the name of the variable and the value that it should take.
+            Note that the input "indexing" will be in the form of a list, so it should be converted to a string with the correct format.
+            """
+            self.ampl_problem.fix_problem_variable(variable_name, ','.join([f'"{x}"' for x in indexing]), value)
       
       def create_ampl_model(self, run_name: str | None = None):
             """

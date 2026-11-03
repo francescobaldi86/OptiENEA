@@ -40,7 +40,7 @@ class ParametricRuns():
             header = [0, 1, 2, 3], 
             index_col = 0,
             na_values = 'baseline',
-            dtype = np.float32
+            # dtype = np.float32
         )
         self.kpis = pd.read_excel(
             os.path.join(self.problem.problem_folder, "Input", self.filename_scenario_description),
@@ -73,7 +73,7 @@ class ParametricRuns():
                 units_filename = self.problem.units_filename,
                 results_folder = os.path.join(self.parametric_runs_results_folder)
                 )
-            validate_project_structure(problem.problem_folder)
+            validate_project_structure(problem.problem_folder, problem.units_filename, problem.general_filename)
             problem.create_folders()  # Creates the project folders
             problem.read_problem_data()  # Reads problem general data and data about units
             # This part updates "raw" values
@@ -93,6 +93,7 @@ class ParametricRuns():
             run_name = f'Scenario {scenario}'  # f'Scenario {scenario} run {datetime.now().strftime("%Y-%m-%d %H:%M").replace(":", ".")}'
             self.scenarios_description.loc[scenario, ('Run name','-','-','-')] = run_name
             problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
+            self.fix_problem_variables(parameters_to_update['Fix'], problem, scenario)
             print(f'Starting solving problem {problem.name} in scenario # {scenario}')
             problem.solve_ampl_problem()  # Solves the optimization problem
             print('Solution completed!')
@@ -250,12 +251,13 @@ class ParametricRuns():
                 raise(f'Column name "{scenarios_to_run}" was not found in the scenario description database')
             
     def check_parameters_to_update(self):
-        parameters_to_update = {'Problem': [], 'Raw': []}
+        parameters_to_update = {'Problem': [], 'Raw': [], 'Fix': []}
         for par in self.scenarios_description.columns:
-            if par[0] == 'Problem':
-                parameters_to_update['Problem'].append(par)
-            else:
-                parameters_to_update['Raw'].append(par)
+            if par[0] == 'Run name':
+                continue
+            if par[0] not in {'Problem', 'Raw', 'Fix'}:
+                raise ValueError(f'Parameter type should be one of "Problem", "Raw" or "Fix". {par[0]} was provided for parameter {par[1:]}')
+            parameters_to_update[par[0]].append(par)
         return parameters_to_update
     
     def update_raw_parameters(self, raw_parameters_to_update, problem, scenario):
@@ -272,6 +274,14 @@ class ParametricRuns():
             indexing = tuple([x for x in param[2:] if x != '-'])
             problem.update_problem_parameters(param_name, indexing, self.scenarios_description.loc[scenario, param])
         return problem
+
+    def fix_problem_variables(self, problem_variables_to_fix, problem, scenario):
+            for variable in problem_variables_to_fix:
+                variable_name = variable[1]
+                indexing = tuple([x for x in variable[2:] if x != '-'])
+                if np.isnan(self.scenarios_description.loc[scenario, variable]) is np.False_:
+                    problem.fix_problem_variable(variable_name, indexing, self.scenarios_description.loc[scenario, variable])
+            return problem
 
     def read_optimization_output_files(self, results_filename):
         kpis = pd.read_excel(
