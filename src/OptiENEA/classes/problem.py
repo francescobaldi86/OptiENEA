@@ -99,6 +99,7 @@ class Problem:
             self.parse_parameters()
             # self.set_objective_function()  # Reads and sets the objective function
             self.create_ampl_model()  # Creates the problem mod file
+            self.export_ampl_model()
             self.solve_ampl_problem()  # Solves the optimization problem
             # self.read_output()  # Reads the output generated
             self.process_output()  # Saves the output into useful and readable data structures
@@ -450,6 +451,8 @@ class Problem:
             self.ampl_problem.write_mod_file()
             self.ampl_problem.write_sets_to_amplpy()
             self.ampl_problem.write_parameters_to_amplpy()
+      
+      def export_ampl_model(self):
             self.ampl_problem.export_model(os.path.join(self.ampl_problem.temp_folder, 'modfile.mod'))
             self.ampl_problem.export_data(os.path.join(self.ampl_problem.temp_folder, 'datfile.dat'))
       

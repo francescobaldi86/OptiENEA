@@ -94,6 +94,7 @@ class ParametricRuns():
             self.scenarios_description.loc[scenario, ('Run name','-','-','-')] = run_name
             problem.create_ampl_model(run_name = run_name)  # Creates the problem mod file
             self.fix_problem_variables(parameters_to_update['Fix'], problem, scenario)
+            problem.export_ampl_model()
             print(f'Starting solving problem {problem.name} in scenario # {scenario}')
             problem.solve_ampl_problem()  # Solves the optimization problem
             print('Solution completed!')

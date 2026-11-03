@@ -92,7 +92,7 @@ class AmplProblem(amplpy.AMPL):
         if self.problem.use_opex_fix is True:
             self.use_opex_fix = True
         if self.problem.use_opex_variable is True:
-                self.use_opex_variable = True
+            self.use_opex_variable = True
 
     def write_mod_file(self):
         self.write_sets()
