@@ -301,7 +301,8 @@ class AmplProblem(amplpy.AMPL):
         additional_constraints = []
         for constraint_type, constraint in self.problem.additional_constraints_data.items():
             if 'activation parameter name' in constraint.keys():
-                additional_constraints.append(f"param {constraint['activation parameter name']} default 1;")
+                activation_parameter_value = constraint['activation parameter value'] if 'activation parameter value' in constraint.keys() else 1
+                additional_constraints.append(f"param {constraint['activation parameter name']} default {activation_parameter_value};")
                 activation_string = f"{{if {constraint['activation parameter name']} == 1}}"
             else:
                 activation_string = ""
