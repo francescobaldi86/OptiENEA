@@ -1,4 +1,5 @@
 from OptiENEA.classes.problem import Problem
+from OptiENEA.classes.objective_function import ObjectiveFunction
 from OptiENEA.helpers.helpers import validate_project_structure, attempt_to_order_results_files
 import pandas as pd
 import numpy as np
@@ -80,6 +81,13 @@ class ParametricRuns():
             # This part updates "raw" values
             self.update_raw_parameters(parameters_to_update['Raw'], problem, scenario)
             problem.read_problem_parameters()
+            # Update the objective
+            if len(parameters_to_update['Objective']) > 0:
+                problem.objective = ObjectiveFunction(self.scenarios_description.loc[scenario, parameters_to_update['Objective'][0]])
+            elif len(parameters_to_update['Objective']) > 1:
+                raise ValueError('Only one objective per scenario can be fixed')
+
+            # Generate typical periods
             if self.typical_periods is None:
                 problem.generate_typical_periods()  # If needed, generates the data about the typical periods
                 self.typical_periods = problem.typical_periods
@@ -253,11 +261,11 @@ class ParametricRuns():
                 raise(f'Column name "{scenarios_to_run}" was not found in the scenario description database')
             
     def check_parameters_to_update(self):
-        parameters_to_update = {'Problem': [], 'Raw': [], 'Fix': []}
+        parameters_to_update = {'Problem': [], 'Raw': [], 'Fix': [], 'Objective': []}
         for par in self.scenarios_description.columns:
             if par[0] == 'Run name':
                 continue
-            if par[0] not in {'Problem', 'Raw', 'Fix'}:
+            if par[0] not in {'Problem', 'Raw', 'Fix', 'Objective'}:
                 raise ValueError(f'Parameter type should be one of "Problem", "Raw" or "Fix". {par[0]} was provided for parameter {par[1:]}')
             parameters_to_update[par[0]].append(par)
         return parameters_to_update
