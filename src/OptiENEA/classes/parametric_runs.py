@@ -71,7 +71,8 @@ class ParametricRuns():
                 temp_folder = os.path.join(self.parametric_runs_temp_folder, f'Scenario {scenario}'),
                 input_folder = self.problem.input_folder,
                 units_filename = self.problem.units_filename,
-                results_folder = os.path.join(self.parametric_runs_results_folder)
+                results_folder = os.path.join(self.parametric_runs_results_folder),
+                timeseriesdata_filename = self.problem.timeseriesdata_filename
                 )
             validate_project_structure(problem.problem_folder, problem.units_filename, problem.general_filename)
             problem.create_folders()  # Creates the project folders

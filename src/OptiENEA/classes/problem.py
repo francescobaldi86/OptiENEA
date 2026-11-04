@@ -109,14 +109,8 @@ class Problem:
             """
             Creates the project folders
             """
-            try:
-                  os.mkdir(self.temp_folder)
-            except FileExistsError:
-                  pass
-            try:
-                  os.mkdir(self.results_folder)
-            except FileExistsError:
-                  pass  
+            os.mkdir(self.temp_folder, exist_ok = True)
+            os.mkdir(self.results_folder, exist_ok = True)
 
       def read_problem_data(self):
             """
@@ -132,7 +126,7 @@ class Problem:
             if 'constraints.yml' in os.listdir(self.input_folder):
                   with open(os.path.join(self.input_folder, 'constraints.yml'), 'r') as stream:
                         self.additional_constraints_data = yaml.safe_load(stream)
-            if 'timeseries_data.csv' in os.listdir(self.input_folder):
+            if self.timeseriesdata_filename in os.listdir(self.input_folder):
                   self.raw_timeseries_data = pd.read_csv(
                         os.path.join(self.input_folder, self.timeseriesdata_filename), 
                         header = [0,1,2], 
