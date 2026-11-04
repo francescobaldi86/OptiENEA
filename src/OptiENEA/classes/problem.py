@@ -109,8 +109,10 @@ class Problem:
             """
             Creates the project folders
             """
-            os.mkdir(self.temp_folder, exist_ok = True)
-            os.mkdir(self.results_folder, exist_ok = True)
+            if not os.path.exists(self.temp_folder):
+                  os.mkdir(self.temp_folder)
+            if not os.path.exists(self.results_folder):
+                  os.mkdir(self.results_folder)
 
       def read_problem_data(self):
             """
