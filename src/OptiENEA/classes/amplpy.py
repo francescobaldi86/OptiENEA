@@ -194,8 +194,10 @@ class AmplProblem(amplpy.AMPL):
             temp_vars.append("var energyStorageLevel0{u in storageUnits, l in layersOfUnit[u]} >=0;")
         if self.has_capex:
             temp_vars.append("var unitAnnualizedInvestmentCost{u in nonmarketUtilities} >= 0;")
+            temp_vars.append("var unitInvestmentCost{u in nonmarketUtilities} >= 0;")
             temp_vars.append("var size{u in nonmarketUtilities} >= 0;")
             temp_vars.append("var CAPEX;")
+            temp_vars.append("var CAPEX_ANN;")
             temp_vars.append("var TOTEX;")
         if self.has_units_with_minimum_size_if_installed:
             temp_vars.append("var ips{u in unitsWithMinimumSizeIfInstalled} binary;")
@@ -221,11 +223,11 @@ class AmplProblem(amplpy.AMPL):
             temp_constraints.append("s.t. calculate_opex: OPEX = OPEX_fuel + OPEX_fix + OPEX_var;")
         temp_constraints.append("s.t. calculate_OPEX_fuel: OPEX_fuel = sum{(u,l) in outputMarketLayers} layer_operating_cost[u,l];")
         if self.use_opex_fix:
-            temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = sum{u in nonmarketUtilities} size[u] * SPECIFIC_OPEX_FIX[u];")
+            temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = sum{u in standardUtilities} size[u] * SPECIFIC_OPEX_FIX[u];")
         else:
             temp_constraints.append("s.t. calculate_OPEX_fix: OPEX_fix = 0.0;")
         if self.use_opex_variable:
-            temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in nonmarketUtilities, t in timeSteps} ics[u,t] * abs(POWER_MAX[u,l]) * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
+            temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = sum{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps} ics[u,t] * abs(POWER_MAX[u,l]) * SPECIFIC_OPEX_VAR[u] * TIME_STEP_DURATION * OCCURRANCE;")
         else:
             temp_constraints.append("s.t. calculate_OPEX_var: OPEX_var = 0.0;")
         temp_constraints.append("s.t. calculate_ghg_emissions: GHG_emissions = sum{(u,l) in outputMarketLayers} layer_ghg_emissions[u,l];")
@@ -234,9 +236,12 @@ class AmplProblem(amplpy.AMPL):
         # Constraints to be added depending on whether we are calculating the cost of the investment or not
         if self.has_capex:
             temp_constraints.append("s.t. component_sizing{u in standardUtilities, l in mainLayerOfUnit[u], t in timeSteps}: size[u] >= ics[u,t] * abs(POWER_MAX[u,l]);")
-            temp_constraints.append("s.t. calculate_capex: CAPEX = sum{u in nonmarketUtilities} unitAnnualizedInvestmentCost[u];")
-            temp_constraints.append("s.t. calculate_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];")
-            temp_constraints.append("s.t. calculate_totex: TOTEX = CAPEX + OPEX;")
+            temp_constraints.append("s.t. calculate_annualized_capex: CAPEX_ANN = sum{u in nonmarketUtilities} unitAnnualizedInvestmentCost[u];")
+            temp_constraints.append("s.t. calculate_annualized_investment_cost{u in nonmarketUtilities}: unitAnnualizedInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST_ANNUALIZED[u];")
+            temp_constraints.append("s.t. calculate_totex: TOTEX = CAPEX_ANN + OPEX;")
+            temp_constraints.append("s.t. calculate_capex: CAPEX = sum{u in nonmarketUtilities} unitInvestmentCost[u];")
+            temp_constraints.append("s.t. calculate_investment_cost{u in nonmarketUtilities}: unitInvestmentCost[u] = size[u] * SPECIFIC_INVESTMENT_COST[u];")
+
         # Constraints added only if the problem has units with a minimum installed size
         if self.has_minimum_installed_power:
             temp_constraints.append("s.t. minimum_installed_power{u in nonmarketUtilities}: size[u] >= POWER_MIN[u];")
@@ -295,16 +300,27 @@ class AmplProblem(amplpy.AMPL):
     def write_additional_constraints(self):
         additional_constraints = []
         for constraint_type, constraint in self.problem.additional_constraints_data.items():
-            if constraint_type == "MaximumYearlyFlowConstraint":
-                additional_constraints.append(f"param {constraint['parameter name']};")
-                additional_constraints.append(f"var {constraint['variable name']};")
-                additional_constraints.append(f"s.t. {constraint['name']}_calculation")
-                additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
-                additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) = {constraint['variable name']};")
-                additional_constraints.append(f"s.t. {constraint['name']}_leq: {constraint['variable name']} <= {constraint['parameter name']};")
-            if constraint_type == "MaximumKPI":
-                additional_constraints.append(f"param {constraint['parameter name']};")
-                additional_constraints.append(f"s.t. {constraint['name']}: {constraint['variable name']} <= {constraint['parameter name']};")
+            match constraint_type:
+                case "MaximumYearlyFlowConstraint":
+                    additional_constraints.append(f"param {constraint['parameter name']};")
+                    additional_constraints.append(f"var {constraint['variable name']};")
+                    additional_constraints.append(f"s.t. {constraint['name']}_calculation")
+                    additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
+                    additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) = {constraint['variable name']};")
+                    additional_constraints.append(f"s.t. {constraint['name']}_leq: {constraint['variable name']} <= {constraint['parameter name']};")
+                case "MaximumKPI":
+                    additional_constraints.append(f"param {constraint['parameter name']};")
+                    additional_constraints.append(f"s.t. {constraint['name']}: {constraint['variable name']} <= {constraint['parameter name']};")
+                case "MaximumNewKPI":
+                    additional_constraints.append(f"param {constraint['parameter name']};")
+                    if 'variable name' in constraint.keys():
+                        additional_constraints.append(f'var {constraint['variable name']}')
+                        additional_constraints.append(constraint['parameter calculation'])
+                        additional_constraints.append(f"s.t. {constraint['name']}: {constraint['variable name']} <= {constraint['parameter name']};")
+                    else:
+                        additional_constraints.append(constraint['parameter calculation'])
+                case _:
+                    raise ValueError(f'The consrtraint type {constraint_type} is not included among the ones that can be accepted')
         temp_mod_string = "\n".join(additional_constraints)
         # We modify all at once if the TIME_STEP_DURATION parameter has variable length
         if self.has_variable_time_step_durations:

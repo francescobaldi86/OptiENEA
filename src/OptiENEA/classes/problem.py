@@ -171,9 +171,9 @@ class Problem:
             self.output_variables = Variable.load_variables_indexing_data(self.raw_general_data['Settings']['Output variables'])
             # Checking if problem has typical periods
             self.has_typical_periods = True if 'Typical periods' in self.raw_general_data['Settings'].keys() else False
-            if 'Use fix OPEX' in self.raw_general_data['Standard parameters']:
+            if 'Use fix OPEX' in self.raw_general_data['Settings']:
                   self.use_opex_fix = self.raw_general_data['Settings']['Use fix OPEX']
-            if 'Use variable OPEX' in self.raw_general_data['Standard parameters']:
+            if 'Use variable OPEX' in self.raw_general_data['Settings']:
                   self.use_opex_variable = self.raw_general_data['Settings']['Use variable OPEX']
             self.objective = ObjectiveFunction(self.raw_general_data['Settings']['Objective'])
 

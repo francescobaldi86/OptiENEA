@@ -25,16 +25,22 @@ StorageUnit:
   Charging unit info:
   Discharging unit info:
   Daily storage loss: 0.0
+  Specific variable OPEX: 0.0
+  Specific fix OPEX: 0.0
  
 ChargingUnit:
   Efficiency: 1.0
   Max charging power: 100000
   Energy requirement layer:
+  Specific variable OPEX: 0.0
+  Specific fix OPEX: 0.0
 
 DischargingUnit:
   Efficiency: 1.0
   Max discharging power: 100000
   Energy requirement layer:
+  Specific variable OPEX: 0.0
+  Specific fix OPEX: 0.0
 
 Market:
   Price: [0.0]

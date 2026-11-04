@@ -69,7 +69,7 @@ class ParametricRuns():
             problem = Problem(
                 name = self.problem.name, 
                 problem_folder = self.problem.problem_folder,
-                temp_folder = os.path.join(self.parametric_runs_temp_folder, f'Scenario {scenario}'),
+                temp_folder = os.path.join(self.parametric_runs_temp_folder),
                 input_folder = self.problem.input_folder,
                 units_filename = self.problem.units_filename,
                 results_folder = os.path.join(self.parametric_runs_results_folder),
