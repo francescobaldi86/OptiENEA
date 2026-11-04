@@ -300,6 +300,11 @@ class AmplProblem(amplpy.AMPL):
     def write_additional_constraints(self):
         additional_constraints = []
         for constraint_type, constraint in self.problem.additional_constraints_data.items():
+            if 'activation parameter name' in constraint.keys():
+                additional_constraints.append(f"param {constraint['activation parameter name']} default 1;")
+                activation_string = f"{{if {constraint['activation parameter name']} == 1}}"
+            else:
+                activation_string = ""
             match constraint_type:
                 case "MaximumYearlyFlowConstraint":
                     additional_constraints.append(f"param {constraint['parameter name']};")
@@ -307,18 +312,18 @@ class AmplProblem(amplpy.AMPL):
                     additional_constraints.append(f"s.t. {constraint['name']}_calculation")
                     additional_constraints.append(f"{{u in units, l in layersOfUnit[u]: u == '{constraint['unit name']}' && l == '{constraint['layer name']}'}}:")
                     additional_constraints.append(f"\tabs(sum{{t in timeSteps}} power[u,l,t] * TIME_STEP_DURATION * OCCURRANCE) = {constraint['variable name']};")
-                    additional_constraints.append(f"s.t. {constraint['name']}_leq: {constraint['variable name']} <= {constraint['parameter name']};")
+                    additional_constraints.append(f"s.t. {constraint['name']}_leq {activation_string}: {constraint['variable name']} <= {constraint['parameter name']};")
                 case "MaximumKPI":
                     additional_constraints.append(f"param {constraint['parameter name']};")
-                    additional_constraints.append(f"s.t. {constraint['name']}: {constraint['variable name']} <= {constraint['parameter name']};")
+                    additional_constraints.append(f"s.t. {constraint['name']} {activation_string}: {constraint['variable name']} <= {constraint['parameter name']};")
                 case "MaximumNewKPI":
                     additional_constraints.append(f"param {constraint['parameter name']};")
                     if 'variable name' in constraint.keys():
                         additional_constraints.append(f'var {constraint['variable name']}')
                         additional_constraints.append(constraint['parameter calculation'])
-                        additional_constraints.append(f"s.t. {constraint['name']}: {constraint['variable name']} <= {constraint['parameter name']};")
+                        additional_constraints.append(f"s.t. {constraint['name']} {activation_string}: {constraint['variable name']} <= {constraint['parameter name']};")
                     else:
-                        additional_constraints.append(constraint['parameter calculation'])
+                        additional_constraints.append(f"s.t. {constraint['name']} {activation_string}: {constraint['parameter calculation']};")
                 case _:
                     raise ValueError(f'The consrtraint type {constraint_type} is not included among the ones that can be accepted')
         temp_mod_string = "\n".join(additional_constraints)

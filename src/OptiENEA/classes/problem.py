@@ -389,6 +389,9 @@ class Problem:
             for constraint_type, constraint in self.additional_constraints_data.items():
                   self.parameters[constraint['parameter name']] = Parameter(constraint['parameter name'], None)
                   self.parameters[constraint['parameter name']].content = constraint['parameter value']
+                  if 'activation parameter name' in constraint.keys():
+                        self.parameters[constraint['activation parameter name']] = Parameter(constraint['activation parameter name'], None)
+                        self.parameters[constraint['activation parameter name']].content = 1
             # Finally doing the conversion from lists to Dataframes
             for param_name, parameter in self.parameters.items():
                   if parameter.indexing_level > 0 and parameter.list_content != []:
