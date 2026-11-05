@@ -1,6 +1,7 @@
 import OptiENEA.helpers.helpers as helpers
 import os, yaml
 from pandas import DataFrame
+from numpy import isnan, nan
 
 with open(f'{os.path.dirname(os.path.realpath(__file__))}\\..\\lib\\default_entities.yml') as stream:
     DEFAULT_ENTITIES = yaml.safe_load(stream)
@@ -12,7 +13,7 @@ class Parameter:
         self.list_content = []
         self.indexing_level = len(indexing_sets) if indexing_sets else 0
         if indexing_sets == None:
-            self.content = 0.0
+            self.content = nan
         else:
             self.content = DataFrame(columns = indexing_sets + [name])
     
@@ -22,7 +23,7 @@ class Parameter:
     def is_empty(self):
         # Checks if the parameter is empty of data
         if self.indexing_level  == 0:
-            if self.content == 0.0:
+            if isnan(self.content):
                 return True
             else:
                 return False
