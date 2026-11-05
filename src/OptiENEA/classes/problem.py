@@ -386,12 +386,12 @@ class Problem:
                   else:
                         raise TypeError(f'Unit {unit_name} has wrong unit type: should be either Process, Utility, StorageUnit or Market')
             # Adding parameters defined in additional constraints      
-            for constraint_type, constraint in self.additional_constraints_data.items():
-                  self.parameters[constraint['parameter name']] = Parameter(constraint['parameter name'], None)
-                  self.parameters[constraint['parameter name']].content = constraint['parameter value']
-                  if 'activation parameter name' in constraint.keys():
-                        self.parameters[constraint['activation parameter name']] = Parameter(constraint['activation parameter name'], None)
-                        self.parameters[constraint['activation parameter name']].content = 1
+            for constraint_name, constraint_info in self.additional_constraints_data.items():
+                  self.parameters[constraint_info['parameter name']] = Parameter(constraint_info['parameter name'], None)
+                  self.parameters[constraint_info['parameter name']].content = constraint_info['parameter value']
+                  if 'activation parameter name' in constraint_info.keys():
+                        self.parameters[constraint_info['activation parameter name']] = Parameter(constraint_info['activation parameter name'], None)
+                        self.parameters[constraint_info['activation parameter name']].content = 1
             # Finally doing the conversion from lists to Dataframes
             for param_name, parameter in self.parameters.items():
                   if parameter.indexing_level > 0 and parameter.list_content != []:
