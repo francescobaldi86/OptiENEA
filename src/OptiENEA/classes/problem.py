@@ -465,6 +465,7 @@ class Problem:
             if getattr(self, "solver_options", None) is not None:
                   self.ampl_problem.set_option("highs_options", " ".join(f"{k}={v}" for k, v in self.solver_options.items()))
                   print("updated:   ", self.ampl_problem.get_option("highs_options"))
+            self.ampl_problem.solve()
             print(self.ampl_problem.solve_result)
 
       def set_objective_function(self):
