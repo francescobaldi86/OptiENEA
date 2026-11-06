@@ -152,6 +152,8 @@ class Problem:
             # Reads the problem's general data into the deidcated structure
             self.interpreter = self.raw_general_data['Settings']['Interpreter']
             self.solver = self.raw_general_data['Settings']['Solver']
+            if 'Solver options' in self.raw_general_data['Settings']:
+                  self.solver_options = self.raw_general_data['Settings']['Solver options']
             # Addiing ampl parameters
             self.interest_rate = self.raw_general_data['Standard parameters']['Interest rate']
             self.simulation_horizon: int = self.raw_general_data['Standard parameters']['NT']
@@ -459,7 +461,10 @@ class Problem:
             """
             Calls the required routine to solve the ampl problem
             """
-            self.ampl_problem.solve(solver = self.solver)
+            self.ampl_problem.set_option("solver", self.solver)
+            if getattr(self, "solver_options", None) is not None:
+                  self.ampl_problem.set_option("highs_options", " ".join(f"{k}={v}" for k, v in self.solver_options.items()))
+                  print("updated:   ", self.ampl_problem.get_option("highs_options"))
             print(self.ampl_problem.solve_result)
 
       def set_objective_function(self):
